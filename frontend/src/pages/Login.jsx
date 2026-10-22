@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { useLocation, useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { BookOpenCheck, Users, TrendingUp } from 'lucide-react'
 
 import { parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { Alert, Button, Field, Logo, PasswordField } from '../components/ui'
-import { homeFor } from '../lib/roles'
 
 const VALORES = [
     { icon: BookOpenCheck, titulo: 'Docentes que organizan', texto: 'Actividades, notas y refuerzos en un solo lugar.' },
@@ -15,8 +14,6 @@ const VALORES = [
 
 export default function Login() {
     const { login } = useAuth()
-    const navigate = useNavigate()
-    const location = useLocation()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
@@ -27,9 +24,9 @@ export default function Login() {
         setError('')
         setLoading(true)
         try {
-            const user = await login(email.trim(), password)
-            const destino = user.must_change_password ? '/cambiar-clave' : (location.state?.from ?? homeFor(user.role))
-            navigate(destino, { replace: true })
+            // Al guardar la sesión, PublicOnly redirige solo: clave temporal -> crear clave;
+            // términos pendientes -> aceptarlos; en otro caso -> inicio del rol.
+            await login(email.trim(), password)
         } catch (err) {
             const { status, message } = parseApiError(err)
             setError(status === 401 || status === 400 ? 'Correo o contraseña incorrectos.' : message)

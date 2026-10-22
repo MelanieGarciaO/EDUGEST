@@ -1,26 +1,34 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 
 import { FullScreenSpinner } from '../components/ui'
-import { homeFor } from '../lib/roles'
+import { destinoTrasAcceso, homeFor } from '../lib/roles'
 import { useAuth } from './AuthContext'
 
 /**
- * Exige sesión iniciada. Si la clave es temporal, obliga a cambiarla primero; luego, si no
- * aceptó la versión vigente de los términos, lo lleva a aceptarlos.
+ * Exige sesión iniciada y que el acceso esté completo (clave definitiva y términos aceptados).
+ * Si falta un paso, lleva a ese paso. Las redirecciones salen siempre del estado del usuario,
+ * nunca de la URL anterior, así no se puede "volver" a una pantalla de acceso ya superada.
  */
 export function RequireAuth() {
     const { user, status } = useAuth()
-    const location = useLocation()
-
     if (status === 'loading') return <FullScreenSpinner label="Cargando tu sesión" />
-    if (status === 'anon') return <Navigate to="/login" replace state={{ from: location.pathname }} />
-    if (user.must_change_password && location.pathname !== '/cambiar-clave') {
-        return <Navigate to="/cambiar-clave" replace />
+    if (status === 'anon') return <Navigate to="/login" replace />
+    if (user.must_change_password || user.debe_aceptar_terminos) {
+        return <Navigate to={destinoTrasAcceso(user)} replace />
     }
-    // Después de crear su contraseña, el usuario acepta los términos y la política de privacidad.
-    if (!user.must_change_password && user.debe_aceptar_terminos && location.pathname !== '/aceptar-terminos') {
-        return <Navigate to="/aceptar-terminos" replace state={{ from: location.pathname }} />
-    }
+    return <Outlet />
+}
+
+/**
+ * Pantallas del proceso de acceso (/cambiar-clave y /aceptar-terminos).
+ * Solo se muestran si ese es el paso pendiente; si no, llevan al destino correcto.
+ */
+export function RequireAccessStep({ path }) {
+    const { user, status } = useAuth()
+    if (status === 'loading') return <FullScreenSpinner label="Cargando tu sesión" />
+    if (status === 'anon') return <Navigate to="/login" replace />
+    const destino = destinoTrasAcceso(user)
+    if (destino !== path) return <Navigate to={destino} replace />
     return <Outlet />
 }
 
@@ -31,18 +39,11 @@ export function RequireRole({ roles }) {
     return <Outlet />
 }
 
-/** Para pantallas públicas (inicio de sesión): si ya hay sesión, redirige al inicio del rol. */
+/** Para pantallas públicas (inicio de sesión): si ya hay sesión, lleva al siguiente paso o al inicio. */
 export function PublicOnly() {
     const { user, status } = useAuth()
     if (status === 'loading') return <FullScreenSpinner label="Cargando tu sesión" />
-    if (status === 'auth') {
-        const destino = user.must_change_password
-            ? '/cambiar-clave'
-            : user.debe_aceptar_terminos
-              ? '/aceptar-terminos'
-              : homeFor(user.role)
-        return <Navigate to={destino} replace />
-    }
+    if (status === 'auth') return <Navigate to={destinoTrasAcceso(user)} replace />
     return <Outlet />
 }
 

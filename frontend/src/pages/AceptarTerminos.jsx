@@ -1,18 +1,16 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { FileText, ShieldCheck } from 'lucide-react'
 
 import { api, parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { Alert, Button, Card, CheckboxField, Logo } from '../components/ui'
 import { fechaLegal, useLegalInfo } from '../lib/legal'
-import { ROLES, homeFor } from '../lib/roles'
+import { ROLES } from '../lib/roles'
 
 /** Primer ingreso (o nueva versión): el usuario acepta los términos y la política de privacidad. */
 export default function AceptarTerminos() {
     const { user, updateUser, logout } = useAuth()
-    const navigate = useNavigate()
-    const location = useLocation()
     const legal = useLegalInfo()
     const [acepto, setAcepto] = useState(false)
     const [autorizo, setAutorizo] = useState(false)
@@ -28,8 +26,8 @@ export default function AceptarTerminos() {
         setError('')
         try {
             const { data } = await api.post('/security/auth/aceptar-terminos/', { version: legal.version, acepto: true })
+            // Al actualizar el usuario, el guard lo lleva directo al inicio de su rol.
             updateUser(data)
-            navigate(location.state?.from && location.state.from !== '/' ? location.state.from : homeFor(data.role), { replace: true })
         } catch (err) {
             setError(parseApiError(err).message)
             legal.refetch()

@@ -1,7 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 
-import { useAuth } from './auth/AuthContext'
-import { PublicOnly, RequireAuth, RequireRole, RootRedirect } from './auth/guards'
+import { PublicOnly, RequireAccessStep, RequireAuth, RequireRole, RootRedirect } from './auth/guards'
 import AppLayout from './layout/AppLayout'
 import { ROLES } from './lib/roles'
 import AdminHome from './pages/AdminHome'
@@ -31,18 +30,6 @@ import RepresentantePlanes from './pages/representante/Planes'
 import Privacidad from './pages/legal/Privacidad'
 import Terminos from './pages/legal/Terminos'
 
-// Con clave temporal la página es independiente; si no, vive dentro del layout.
-function ChangeRoute() {
-  const { user } = useAuth()
-  return user.must_change_password ? (
-    <ChangePassword />
-  ) : (
-    <AppLayout>
-      <ChangePassword />
-    </AppLayout>
-  )
-}
-
 export default function App() {
   return (
     <Routes>
@@ -54,7 +41,6 @@ export default function App() {
         <Route path="/" element={<RootRedirect />} />
         <Route element={<AppLayout />}>
           <Route element={<RequireRole roles={[ROLES.ADMINISTRADOR]} />}>
-            <Route path="/admin" element={<AdminHome />} />
             <Route path="/admin" element={<AdminHome />} />
             <Route path="/admin/usuarios" element={<Users />} />
             <Route path="/admin/academico" element={<Academico />} />
@@ -84,7 +70,14 @@ export default function App() {
           </Route>
           <Route path="/perfil" element={<Profile />} />
         </Route>
-        <Route path="/cambiar-clave" element={<ChangeRoute />} />
+      </Route>
+
+      {/* Pasos del primer acceso: solo existen mientras están pendientes.
+          El cambio de contraseña voluntario se hace desde Perfil. */}
+      <Route element={<RequireAccessStep path="/cambiar-clave" />}>
+        <Route path="/cambiar-clave" element={<ChangePassword />} />
+      </Route>
+      <Route element={<RequireAccessStep path="/aceptar-terminos" />}>
         <Route path="/aceptar-terminos" element={<AceptarTerminos />} />
       </Route>
 
