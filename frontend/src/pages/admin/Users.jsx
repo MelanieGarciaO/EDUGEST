@@ -45,6 +45,13 @@ function IconButton({ label, onClick, children, tone }) {
 /** Muestra la contraseña temporal una sola vez, con botón para copiarla. */
 function TemporaryPassword({ data, onClose }) {
     const [copied, setCopied] = useState(false)
+    const [prevData, setPrevData] = useState(data)
+
+    // Cada contraseña nueva empieza con el botón en "Copiar".
+    if (prevData !== data) {
+        setPrevData(data)
+        setCopied(false)
+    }
 
     async function copy() {
         try {
@@ -65,10 +72,14 @@ function TemporaryPassword({ data, onClose }) {
             {data && (
                 <>
                     <p className="text-ink-700">
-                        Entrega esta contraseña temporal a <strong>{data.name}</strong>. Deberá cambiarla al iniciar sesión.
+                        <span>Entrega esta contraseña temporal a </span>
+                        <strong>{data.name}</strong>
+                        <span>. Deberá cambiarla al iniciar sesión.</span>
                     </p>
                     <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3">
-                        <code className="text-lg font-bold break-all text-navy-800">{data.password}</code>
+                        <code translate="no" className="notranslate text-lg font-bold break-all text-navy-800">
+                            {data.password}
+                        </code>
                         <Button variant="secondary" className="min-h-10 shrink-0 px-3" onClick={copy}>
                             {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
                             {copied ? 'Copiada' : 'Copiar'}
@@ -222,6 +233,7 @@ export default function Users() {
         onSuccess: (data, u) => {
             setReset(null)
             setTemp({ title: 'Contraseña restablecida', name: `${u.first_name} ${u.last_name}`, password: data.temporary_password })
+            refresh() // muestra el chip "Clave temporal" en la lista
         },
     })
 
@@ -290,7 +302,8 @@ export default function Users() {
                                 <li key={u.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
                                     <div className="min-w-0 flex-1 basis-56">
                                         <p className="truncate font-bold text-ink-900">
-                                            {u.full_name} {isSelf && <span className="font-medium text-ink-500">(tú)</span>}
+                                            <span>{u.full_name}</span>
+                                            {isSelf ? <span className="font-medium text-ink-500"> (tú)</span> : null}
                                         </p>
                                         <p className="truncate text-sm text-ink-500">{u.email}</p>
                                     </div>
@@ -358,9 +371,11 @@ export default function Users() {
                     toggleMutation.reset()
                 }}
             >
-                {toggle?.is_active
-                    ? `${toggle?.full_name} ya no podrá iniciar sesión. Sus datos se conservan y puedes activarlo de nuevo cuando quieras.`
-                    : `${toggle?.full_name} podrá volver a iniciar sesión con su contraseña actual.`}
+                <span>
+                    {toggle?.is_active
+                        ? `${toggle?.full_name} ya no podrá iniciar sesión. Sus datos se conservan y puedes activarlo de nuevo cuando quieras.`
+                        : `${toggle?.full_name} podrá volver a iniciar sesión con su contraseña actual.`}
+                </span>
             </ConfirmDialog>
 
             <ConfirmDialog
@@ -376,8 +391,9 @@ export default function Users() {
                     resetMutation.reset()
                 }}
             >
-                Se generará una contraseña temporal para {reset?.full_name} y se cerrarán sus sesiones abiertas. Tendrá que
-                cambiarla al ingresar.
+                <span>
+                    {`Se generará una contraseña temporal para ${reset?.full_name ?? ''} y se cerrarán sus sesiones abiertas. Tendrá que cambiarla al ingresar.`}
+                </span>
             </ConfirmDialog>
 
             <TemporaryPassword data={temp} onClose={() => setTemp(null)} />

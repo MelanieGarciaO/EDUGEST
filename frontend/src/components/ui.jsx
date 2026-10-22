@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Children, useEffect, useId, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, Eye, EyeOff, GraduationCap, Loader2, X } from 'lucide-react'
 
 import { initials } from '../lib/roles'
@@ -48,6 +48,17 @@ const BUTTON_VARIANTS = {
     ghost: 'text-brand-700 hover:bg-brand-100',
 }
 
+/**
+ * Envuelve los textos sueltos en <span>. Así React nunca usa un nodo de texto como
+ * referencia para insertBefore (p. ej. al mostrar el spinner de carga). Si el traductor
+ * del navegador o una extensión reemplaza ese texto, la app ya no se rompe.
+ */
+function wrapText(children) {
+    return Children.map(children, (child) =>
+        typeof child === 'string' || typeof child === 'number' ? <span>{child}</span> : child,
+    )
+}
+
 export function Button({ variant = 'primary', loading = false, className, children, disabled, ...rest }) {
     return (
         <button
@@ -61,8 +72,8 @@ export function Button({ variant = 'primary', loading = false, className, childr
             )}
             {...rest}
         >
-            {loading && <Spinner className="size-4" />}
-            {children}
+            {loading ? <Spinner className="size-4" /> : null}
+            {wrapText(children)}
         </button>
     )
 }
@@ -300,8 +311,8 @@ export function ConfirmDialog({ open, title, children, confirmLabel, tone = 'dan
                 </>
             }
         >
-            {error && <Alert className="mb-3">{error}</Alert>}
-            <div className="text-ink-700">{children}</div>
+            {error ? <Alert className="mb-3">{error}</Alert> : null}
+            <div className="text-ink-700">{wrapText(children)}</div>
         </Modal>
     )
 }
