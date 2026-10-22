@@ -1,0 +1,50 @@
+{
+    "_nota": "Recursos ILUSTRATIVOS para pruebas y demostraciones, ligados a temas_ejemplo.json. Niveles: BASICO, INTERMEDIO, AVANZADO. Estrategias: INDIVIDUAL, GRUPAL, ENTRE_IGUALES, TECNOLOGIA, COOPERATIVO, TAREA_CASA.",
+    "temas": [
+        {
+            "asignatura": "Matemática",
+            "tema": "Fracciones",
+            "recursos": [
+                { "nivel": "BASICO", "estrategia": "INDIVIDUAL", "titulo": "Representar fracciones con dibujos", "instrucciones": "Dibuja una pizza, una barra y un círculo y pinta las partes que indica cada fracción.", "duracion_minutos": 15 },
+                { "nivel": "BASICO", "estrategia": "INDIVIDUAL", "titulo": "Numerador y denominador", "instrucciones": "Escribe 10 fracciones y señala con colores el numerador y el denominador de cada una.", "duracion_minutos": 10 },
+                { "nivel": "BASICO", "estrategia": "TAREA_CASA", "titulo": "Fracciones en objetos del hogar", "instrucciones": "Busca 5 objetos de la casa y expresa con una fracción la parte que usas o consumes.", "duracion_minutos": 20 },
+                { "nivel": "INTERMEDIO", "estrategia": "TECNOLOGIA", "titulo": "Comparar fracciones en la recta", "instrucciones": "Ubica 8 fracciones en una recta numérica y ordénalas de menor a mayor.", "duracion_minutos": 20 },
+                { "nivel": "INTERMEDIO", "estrategia": "COOPERATIVO", "titulo": "Problemas con fracciones cotidianas", "instrucciones": "Resuelve 5 problemas de recetas y repartos que usan fracciones.", "duracion_minutos": 25 },
+                { "nivel": "INTERMEDIO", "estrategia": "INDIVIDUAL", "titulo": "Fracciones de una cantidad", "instrucciones": "Calcula la fracción de una cantidad en 10 ejercicios, explicando cada paso.", "duracion_minutos": 20 },
+                { "nivel": "AVANZADO", "estrategia": "TAREA_CASA", "titulo": "Inventa tu propio problema", "instrucciones": "Escribe un problema con fracciones, resuélvelo y pide a un familiar que lo compruebe.", "duracion_minutos": 25 }
+            ]
+        },
+        {
+            "asignatura": "Matemática",
+            "tema": "Fracciones equivalentes",
+            "recursos": [
+                { "nivel": "BASICO", "estrategia": "INDIVIDUAL", "titulo": "Dobla y compara", "instrucciones": "Dobla tiras de papel en partes iguales y descubre qué fracciones ocupan el mismo espacio.", "duracion_minutos": 15 },
+                { "nivel": "INTERMEDIO", "estrategia": "ENTRE_IGUALES", "titulo": "Amplificar y simplificar", "instrucciones": "Encuentra 3 fracciones equivalentes para cada una de 6 fracciones dadas.", "duracion_minutos": 20 }
+            ]
+        },
+        {
+            "asignatura": "Matemática",
+            "tema": "Operaciones con fracciones",
+            "recursos": [
+                { "nivel": "BASICO", "estrategia": "INDIVIDUAL", "titulo": "Sumar fracciones de igual denominador", "instrucciones": "Resuelve 10 sumas de fracciones con el mismo denominador.", "duracion_minutos": 15 },
+                { "nivel": "INTERMEDIO", "estrategia": "ENTRE_IGUALES", "titulo": "Sumar fracciones de distinto denominador", "instrucciones": "Resuelve 8 sumas buscando primero el denominador común.", "duracion_minutos": 25 }
+            ]
+        },
+        {
+            "asignatura": "Matemática",
+            "tema": "Números decimales",
+            "recursos": [
+                { "nivel": "BASICO", "estrategia": "INDIVIDUAL", "titulo": "Leer y escribir decimales", "instrucciones": "Escribe con palabras y en cifras 10 números decimales.", "duracion_minutos": 15 },
+                { "nivel": "INTERMEDIO", "estrategia": "TAREA_CASA", "titulo": "Decimales en el dinero", "instrucciones": "Resuelve 5 problemas de compras con precios en dólares y centavos.", "duracion_minutos": 25 }
+            ]
+        },
+        {
+            "asignatura": "Lengua y Literatura",
+            "tema": "Comprensión lectora",
+            "recursos": [
+                { "nivel": "BASICO", "estrategia": "INDIVIDUAL", "titulo": "Lee y responde", "instrucciones": "Lee un cuento corto y responde 5 preguntas sobre quién, qué, dónde y cuándo.", "duracion_minutos": 20 },
+                { "nivel": "INTERMEDIO", "estrategia": "TAREA_CASA", "titulo": "Ordena la historia", "instrucciones": "Lee un texto, ordena sus sucesos y cuéntalo con tus palabras a un familiar.", "duracion_minutos": 25 }
+            ]
+        }
+    ]
+}

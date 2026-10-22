@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/figtree';
+
+/*
+  Identidad visual tomada de la imagen del caso de estudio: encabezado azul marino,
+  menú lateral claro, tarjetas blancas y azul como acento. El verde confirma y el rojo
+  marca fechas de entrega y avisos.
+*/
+@theme {
+  --font-sans: 'Figtree Variable', system-ui, sans-serif;
+
+  --color-navy-900: #102f54;
+  --color-navy-800: #17406f;
+  --color-navy-700: #1f5391;
+
+  --color-brand-50: #eef5fc;
+  --color-brand-100: #dbeaf9;
+  --color-brand-200: #bcd7f3;
+  --color-brand-500: #2a7bd6;
+  --color-brand-600: #1f6bc2;
+  --color-brand-700: #1a58a0;
+
+  --color-ink-900: #14233a;
+  --color-ink-700: #3a4a63;
+  --color-ink-500: #66758c;
+  --color-ink-300: #aab5c5;
+  --color-line: #dfe7f1;
+
+  --color-ok-50: #e9f7ee;
+  --color-ok-600: #1f9a4d;
+  --color-danger-50: #fdecee;
+  --color-danger-600: #d6384a;
+  --color-warn-50: #fff4e0;
+  --color-warn-600: #b86e00;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-brand-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

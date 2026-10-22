@@ -1,0 +1,23 @@
+{
+    "grados": [
+        { "orden": 1, "nombre": "Primero EGB" },
+        { "orden": 2, "nombre": "Segundo EGB" },
+        { "orden": 3, "nombre": "Tercero EGB" },
+        { "orden": 4, "nombre": "Cuarto EGB" },
+        { "orden": 5, "nombre": "Quinto EGB" },
+        { "orden": 6, "nombre": "Sexto EGB" },
+        { "orden": 7, "nombre": "Séptimo EGB" },
+        { "orden": 8, "nombre": "Octavo EGB" },
+        { "orden": 9, "nombre": "Noveno EGB" },
+        { "orden": 10, "nombre": "Décimo EGB" }
+    ],
+    "asignaturas": [
+        "Matemática",
+        "Lengua y Literatura",
+        "Ciencias Naturales",
+        "Estudios Sociales",
+        "Inglés",
+        "Educación Física",
+        "Educación Cultural y Artística"
+    ]
+}

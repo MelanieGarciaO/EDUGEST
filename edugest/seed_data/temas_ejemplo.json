@@ -1,0 +1,28 @@
+{
+    "_nota": "Temas ILUSTRATIVOS para pruebas y demostraciones. No son el currículo oficial: reemplázalos por los temas reales de la institución.",
+    "asignaturas": [
+        {
+            "asignatura": "Matemática",
+            "temas": [
+                { "nombre": "Fracciones", "subtemas": ["Fracciones equivalentes", "Operaciones con fracciones"] },
+                { "nombre": "Números decimales", "subtemas": [] },
+                { "nombre": "Proporcionalidad", "subtemas": [] }
+            ]
+        },
+        {
+            "asignatura": "Lengua y Literatura",
+            "temas": [
+                { "nombre": "Comprensión lectora", "subtemas": ["Idea principal"] },
+                { "nombre": "Ortografía", "subtemas": [] },
+                { "nombre": "Tipos de texto", "subtemas": [] }
+            ]
+        },
+        {
+            "asignatura": "Ciencias Naturales",
+            "temas": [
+                { "nombre": "Ecosistemas", "subtemas": [] },
+                { "nombre": "El cuerpo humano", "subtemas": [] }
+            ]
+        }
+    ]
+}
