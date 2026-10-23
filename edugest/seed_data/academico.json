@@ -4,12 +4,12 @@
         { "orden": 2, "nombre": "Segundo EGB" },
         { "orden": 3, "nombre": "Tercero EGB" },
         { "orden": 4, "nombre": "Cuarto EGB" },
-        { "orden": 5, "nombre": "Quinto EGB" },
-        { "orden": 6, "nombre": "Sexto EGB" },
-        { "orden": 7, "nombre": "Séptimo EGB" },
-        { "orden": 8, "nombre": "Octavo EGB" },
-        { "orden": 9, "nombre": "Noveno EGB" },
-        { "orden": 10, "nombre": "Décimo EGB" }
+        { "orden": 5, "nombre": "Quinto EGBM" },
+        { "orden": 6, "nombre": "Sexto EGBM" },
+        { "orden": 7, "nombre": "Séptimo EGBM" },
+        { "orden": 8, "nombre": "Octavo EGBS" },
+        { "orden": 9, "nombre": "Noveno EGBS" },
+        { "orden": 10, "nombre": "Décimo EGBS" }
     ],
     "asignaturas": [
         "Matemática",
