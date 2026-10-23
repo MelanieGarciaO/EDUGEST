@@ -13,14 +13,39 @@ export const NIVELES = [
 export const NIVEL_LABEL = Object.fromEntries(NIVELES.map((n) => [n.value, n.label]))
 export const NIVEL_TONE = { BASICO: 'ok', INTERMEDIO: 'brand', AVANZADO: 'warn' }
 
-/** Nivel cualitativo de una nota (escala LOEI sobre 10). */
-export const NOTA_TONE = { DOMINA: 'ok', ALCANZA: 'brand', PROXIMO: 'warn', NO_ALCANZA: 'danger' }
+/**
+ * Escala cualitativa del Reglamento General a la LOEI (sobre 10). Es el mismo cálculo que
+ * `grades/scale.py` en el backend, para poder mostrar el semáforo en tiempo real.
+ */
+export const ESCALA_LOEI = [
+    { nivel: 'DOMINA', sigla: 'DAR', nombre: 'Domina los aprendizajes requeridos', rango: '9,00 – 10,00', tone: 'ok' },
+    { nivel: 'ALCANZA', sigla: 'AAR', nombre: 'Alcanza los aprendizajes requeridos', rango: '7,00 – 8,99', tone: 'brand' },
+    { nivel: 'PROXIMO', sigla: 'PAAR', nombre: 'Está próximo a alcanzar los aprendizajes requeridos', rango: '4,01 – 6,99', tone: 'warn' },
+    { nivel: 'NO_ALCANZA', sigla: 'NAAR', nombre: 'No alcanza los aprendizajes requeridos', rango: '0,00 – 4,00', tone: 'danger' },
+]
+const POR_NIVEL = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e]))
+
+export const NOTA_TONE = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e.tone]))
+export const NOTA_SIGLA = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e.sigla]))
+export const NOTA_NOMBRE = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e.nombre]))
 export const NOTA_LABEL = {
     DOMINA: 'Domina',
     ALCANZA: 'Alcanza',
     PROXIMO: 'Próximo a alcanzar',
     NO_ALCANZA: 'No alcanza',
 }
+
+/** Nivel cualitativo de una nota (número 0–10). null si no hay nota. */
+export function nivelNota(valor) {
+    if (valor == null || Number.isNaN(Number(valor))) return null
+    const v = Number(valor)
+    if (v >= 9) return 'DOMINA'
+    if (v >= 7) return 'ALCANZA'
+    if (v > 4) return 'PROXIMO'
+    return 'NO_ALCANZA'
+}
+
+export const infoNivel = (nivel) => POR_NIVEL[nivel] ?? null
 
 /** Formatea una nota «8.5» como «8,50». */
 export const formatNota = (v) => (v == null ? '' : Number(v).toFixed(2).replace('.', ','))

@@ -1,8 +1,9 @@
 import { CalendarDays } from 'lucide-react'
 
 import { diasRestantes, formatFecha, horaCorta, textoPlazo } from '../lib/dates'
-import { NOTA_LABEL, NOTA_TONE, formatNota } from '../lib/format'
+import { formatNota } from '../lib/format'
 import { MaterialesChips } from './Materiales'
+import { NivelChip } from './Semaforo'
 import { Chip, cx } from './ui'
 
 /** Tarjeta de una actividad. `children` recibe las acciones (editar, cancelar…). */
@@ -86,7 +87,7 @@ function NotasActividad({ notas }) {
                         <p className="text-sm text-ink-500">Tema: {n.tema_nombre}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Chip tone={NOTA_TONE[n.nivel]}>{NOTA_LABEL[n.nivel]}</Chip>
+                        <NivelChip nivel={n.nivel} />
                         <span className="text-2xl font-extrabold text-navy-800">
                             {formatNota(n.valor)}
                             <span className="text-sm font-bold text-ink-500"> / 10</span>

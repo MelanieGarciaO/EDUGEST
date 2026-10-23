@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { BarChart3 } from 'lucide-react'
 
 import { Alert, Card, Chip, EmptyState, PageHeader, SelectField, Spinner, cx } from '../components/ui'
-import { NOTA_LABEL, NOTA_TONE, formatNota } from '../lib/format'
+import { LeyendaSemaforo, NivelChip } from '../components/Semaforo'
+import { formatNota } from '../lib/format'
 import { useDesempeno, useEstudiantes } from '../lib/queries'
 
 const BARRA = { DOMINA: 'bg-ok-600', ALCANZA: 'bg-brand-600', PROXIMO: 'bg-warn-600', NO_ALCANZA: 'bg-danger-600' }
@@ -32,7 +33,7 @@ function Tema({ t, nivelAnidado = 0 }) {
                         <Dificultad d={t.dificultad} />
                     </div>
                     <p className="flex items-center gap-2">
-                        {t.promedio != null && <Chip tone={NOTA_TONE[t.nivel]}>{NOTA_LABEL[t.nivel]}</Chip>}
+                        {t.promedio != null ? <NivelChip nivel={t.nivel} corto /> : null}
                         <span className="min-w-12 text-right text-lg font-extrabold text-navy-800">{t.promedio != null ? formatNota(t.promedio) : '—'}</span>
                     </p>
                 </div>
@@ -63,6 +64,7 @@ export default function Desempeno() {
     return (
         <>
             <PageHeader title="Desempeño" subtitle="Promedio y nivel de aprendizaje por asignatura y tema." />
+            <LeyendaSemaforo className="mb-5 max-w-3xl" />
 
             {estudiantes.isLoading && <Spinner />}
             {estudiantes.isError && <Alert>No se pudieron cargar los estudiantes. Intenta de nuevo.</Alert>}
@@ -98,7 +100,7 @@ export default function Desempeno() {
                             <div className="text-right">
                                 <p className="text-3xl font-extrabold leading-none text-navy-800">{formatNota(a.promedio)}</p>
                                 <div className="mt-1.5">
-                                    <Chip tone={NOTA_TONE[a.nivel]}>{NOTA_LABEL[a.nivel]}</Chip>
+                                    <NivelChip nivel={a.nivel} />
                                 </div>
                             </div>
                         </div>
