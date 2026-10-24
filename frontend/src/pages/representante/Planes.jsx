@@ -57,6 +57,11 @@ export default function RepresentantePlanes() {
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h2 className="text-lg font-extrabold text-navy-800">{p.estudiante_nombre}</h2>
                                     <Chip tone={PLAN_ESTADO_TONE[p.estado]}>{PLAN_ESTADO_LABEL[p.estado]}</Chip>
+                                    {p.revisado_en ? (
+                                        <Chip tone="ok">Revisado</Chip>
+                                    ) : ['APROBADA', 'COMPLETADA'].includes(p.estado) ? (
+                                        <Chip tone="warn">Pendiente de confirmar revisión</Chip>
+                                    ) : null}
                                 </div>
                                 <p className="text-sm text-ink-500">{p.asignatura_nombre} · Docente: {p.docente_nombre}</p>
                                 <p className="mt-2 text-sm text-ink-700">

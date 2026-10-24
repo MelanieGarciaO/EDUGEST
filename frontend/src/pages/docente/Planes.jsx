@@ -138,7 +138,7 @@ function GenerarPlanModal({ open, onClose }) {
                                 {dificultades.map((d) => (
                                     <li key={d.id}>
                                         <Chip tone={d.nivel === 'ALTA' ? 'danger' : 'warn'}>
-                                            {d.tema_nombre} · {formatNota(d.promedio)}
+                                            {`${d.tema_nombre} · ${formatNota(d.promedio)}${d.reincidente ? ' · reincidente' : ''}`}
                                         </Chip>
                                     </li>
                                 ))}
@@ -223,6 +223,7 @@ export default function DocentePlanes() {
                                     <h2 className="text-lg font-extrabold text-navy-800">{p.estudiante_nombre}</h2>
                                     <Chip tone={PLAN_ESTADO_TONE[p.estado]}>{PLAN_ESTADO_LABEL[p.estado]}</Chip>
                                     {evaluacionPlan(p.evaluacion) && <Chip tone={evaluacionPlan(p.evaluacion).tone}>{evaluacionPlan(p.evaluacion).label}</Chip>}
+                                    {p.revisado_en ? <Chip tone="ok">Revisado por la familia</Chip> : null}
                                 </div>
                                 <p className="text-sm text-ink-500">{p.asignatura_nombre} · {p.paralelo_nombre}</p>
                                 <p className="mt-2 text-sm text-ink-700">

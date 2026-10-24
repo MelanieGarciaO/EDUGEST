@@ -49,8 +49,9 @@ INSTITUCION_CIUDAD = env("INSTITUCION_CIUDAD", default="")
 INSTITUCION_CORREO_PRIVACIDAD = env("INSTITUCION_CORREO_PRIVACIDAD", default="")
 DATOS_PLAZO_CONSERVACION = env("DATOS_PLAZO_CONSERVACION", default="")
 
-# Grados de EGB habilitados: del 1.º hasta este número (1 a 10). Súbelo para abrir más grados.
-GRADO_MAXIMO_HABILITADO = env.int("GRADO_MAXIMO_HABILITADO", default=4)
+# Grados de EGB habilitados (1 a 10). Por defecto, EGB Media: de 5.º (Quinto) a 7.º (Séptimo).
+GRADO_MINIMO_HABILITADO = env.int("GRADO_MINIMO_HABILITADO", default=5)
+GRADO_MAXIMO_HABILITADO = env.int("GRADO_MAXIMO_HABILITADO", default=7)
 
 # ---------------------------------------------------------------------------
 # Aplicaciones

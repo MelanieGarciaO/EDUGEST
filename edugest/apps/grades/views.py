@@ -185,7 +185,7 @@ class DesempenoEstudianteView(APIView):
 class DificultadViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Dificultades detectadas según el rol.
-    Filtros: ?estado=DETECTADA|SUPERADA ?nivel=MODERADA|ALTA ?estudiante= ?paralelo=
+    Filtros: ?estado=DETECTADA|SUPERADA ?nivel=MODERADA|ALTA ?reincidente=true|false ?estudiante= ?paralelo=
              ?asignatura= ?tema=
     """
 
@@ -209,6 +209,13 @@ class DificultadViewSet(viewsets.ReadOnlyModelViewSet):
             if nivel not in Dificultad.Nivel.values:
                 raise ValidationError({"nivel": "Valores válidos: MODERADA, ALTA."})
             qs = qs.filter(nivel=nivel)
+
+        reincidente = params.get("reincidente")
+        if reincidente:
+            reincidente = reincidente.lower()
+            if reincidente not in ("true", "false"):
+                raise ValidationError({"reincidente": "Valores válidos: true, false."})
+            qs = qs.filter(veces_detectada__gt=1) if reincidente == "true" else qs.filter(veces_detectada=1)
 
         qs = filter_by_id(qs, params, "estudiante", "estudiante_id")
         qs = filter_by_id(qs, params, "paralelo", "estudiante__paralelo_id")

@@ -18,6 +18,7 @@ export function PlanHeader({ plan, docente = false }) {
                         <Chip tone={PLAN_ESTADO_TONE[plan.estado]}>{PLAN_ESTADO_LABEL[plan.estado]}</Chip>
                         <Chip tone={plan.nivel === 'ALTO' ? 'danger' : 'brand'}>{PLAN_NIVEL_LABEL[plan.nivel]}</Chip>
                         {ev && <Chip tone={ev.tone}>{ev.label}</Chip>}
+                        {plan.revisado_en ? <Chip tone="ok">Revisado por la familia</Chip> : null}
                     </div>
                     <p className="text-ink-500">
                         {plan.asignatura_nombre} · {plan.paralelo_nombre} · Docente: {plan.docente_nombre}
@@ -28,6 +29,11 @@ export function PlanHeader({ plan, docente = false }) {
                         {plan.completado_en && ` · Completado el ${fecha(plan.completado_en)}`}
                         {plan.cancelado_en && ` · Cancelado el ${fecha(plan.cancelado_en)}`}
                     </p>
+                    {plan.revisado_en ? (
+                        <p className="mt-0.5 text-sm text-ok-600">
+                            {`Revisado por ${plan.revisado_por_nombre ?? 'el representante'} el ${fecha(plan.revisado_en)}`}
+                        </p>
+                    ) : null}
                 </div>
                 <div className="min-w-44 flex-1 basis-44 sm:max-w-xs">
                     <p className="flex justify-between text-sm font-bold text-ink-700">
@@ -106,6 +112,7 @@ export function PlanTemas({ plan, actions, temaActions }) {
                                         {t.nivel_dificultad === 'ALTA' ? 'Dificultad alta' : 'Dificultad moderada'}
                                     </Chip>
                                 )}
+                                {t.dificultad_reincidente ? <Chip tone="danger">Reincidente</Chip> : null}
                                 {(t.superado === true || (t.superado == null && t.dificultad_estado === 'SUPERADA')) && <Chip tone="ok">Tema superado</Chip>}
                             </div>
                             <p className="text-sm text-ink-500">

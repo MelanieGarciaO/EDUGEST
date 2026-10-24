@@ -22,4 +22,5 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 logging.disable(logging.WARNING)
 
 # Las pruebas existentes usan grados altos (7.º y 8.º); la restricción se prueba aparte.
+GRADO_MINIMO_HABILITADO = 1
 GRADO_MAXIMO_HABILITADO = 10

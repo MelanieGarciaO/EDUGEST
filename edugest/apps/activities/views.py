@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from apps.academic import selectors as academic_selectors
-from apps.academic.models import AsignacionDocente
+from apps.academic.models import AsignacionDocente, Tema
 from apps.grades.models import Calificacion
 from apps.security.models import Role
 from apps.security.permissions import IsDocente, IsPasswordUpToDate
@@ -129,8 +129,19 @@ class ActividadViewSet(viewsets.ModelViewSet):
         ).select_related("asignatura")
         disponibles = [(a.asignatura_id, a.asignatura.nombre) for a in asignaciones]
 
+        # Catálogo de temas (y subtemas) del grado para reconocer el tema en la indicación.
+        temas = list(
+            Tema.objects.filter(
+                grado_id=paralelo.grado_id,
+                asignatura_id__in=[asig_id for asig_id, _ in disponibles],
+                is_active=True,
+            ).values_list("id", "nombre", "asignatura_id")
+        )
+
         pipeline = nlp.obtener_nlp()
-        propuesta = nlp.extraer(texto, disponibles, timezone.localdate(), nlp=pipeline)
+        propuesta = nlp.extraer(
+            texto, disponibles, timezone.localdate(), nlp=pipeline, temas=temas
+        )
 
         extraccion = Extraccion.objects.create(
             docente=request.user,

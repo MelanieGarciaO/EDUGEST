@@ -6,10 +6,19 @@ import { ArrowLeft, History, Save } from 'lucide-react'
 import { api, parseApiError } from '../../api/client'
 import { Alert, Button, Card, Chip, PageHeader, SelectField, Spinner } from '../../components/ui'
 import { formatFecha, hoyISO } from '../../lib/dates'
-import { NOTA_LABEL, NOTA_TONE, formatNota } from '../../lib/format'
+import { LeyendaSemaforo, NivelChip } from '../../components/Semaforo'
+import { formatNota, nivelNota } from '../../lib/format'
 import { useActividad, useNotasActividad, useParalelos, useTemasActivos } from '../../lib/queries'
 
 /** Convierte «8,5» o «8.5» en un número válido entre 0 y 10; null si está vacío y NaN si no sirve. */
+/** Borde del campo de nota según el semáforo LOEI. */
+const BORDE_NIVEL = {
+    DOMINA: 'border-ok-600',
+    ALCANZA: 'border-brand-600',
+    PROXIMO: 'border-warn-600 bg-warn-50',
+    NO_ALCANZA: 'border-danger-600 bg-danger-50',
+}
+
 function leerNota(texto) {
     const t = texto.trim().replace(',', '.')
     if (t === '') return null
@@ -159,6 +168,7 @@ export default function Calificar() {
                 )}
             </Card>
 
+            <LeyendaSemaforo className="mb-3 max-w-3xl" />
             <p className="mb-2 text-sm text-ink-500">
                 {resumen.calificados} de {resumen.estudiantes} calificados
                 {resumen.promedio != null && ` · Promedio del paralelo: ${formatNota(resumen.promedio)}`}
@@ -168,13 +178,15 @@ export default function Calificar() {
                 {filas.map((f) => {
                     const texto = valores[f.estudiante] ?? ''
                     const malo = Number.isNaN(leerNota(texto))
-                    const nivel = f.nivel && texto === formatNota(f.valor) ? f.nivel : null
+                    // Semáforo en tiempo real: el nivel cambia mientras el docente escribe la nota.
+                    const valor = malo ? null : leerNota(texto)
+                    const nivel = nivelNota(valor)
                     return (
                         <li key={f.estudiante} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
                             <div className="min-w-0 flex-1 basis-48">
                                 <p className="font-bold text-ink-900">{f.estudiante_nombre}</p>
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {nivel ? <Chip tone={NOTA_TONE[nivel]}>{NOTA_LABEL[nivel]}</Chip> : !f.valor && <span className="text-sm text-ink-500">Sin calificar</span>}
+                                    {nivel ? <NivelChip nivel={nivel} /> : <span className="text-sm text-ink-500">Sin calificar</span>}
                                     {porEvaluar[f.estudiante] && <Chip tone="warn">Plan completado · evaluar: {porEvaluar[f.estudiante].join(', ')}</Chip>}
                                 </div>
                                 {f.calificacion && (
@@ -201,7 +213,7 @@ export default function Calificar() {
                                     value={texto}
                                     aria-invalid={malo ? 'true' : undefined}
                                     onChange={(e) => setValores((v) => ({ ...v, [f.estudiante]: e.target.value }))}
-                                    className={`block min-h-11 w-28 rounded-xl border bg-white px-3 text-right text-[15px] font-bold disabled:bg-brand-50 ${malo ? 'border-danger-600' : 'border-line hover:border-ink-300'}`}
+                                    className={`block min-h-11 w-28 rounded-xl border bg-white px-3 text-right text-[15px] font-bold disabled:bg-brand-50 ${malo ? 'border-danger-600' : BORDE_NIVEL[nivel] ?? 'border-line hover:border-ink-300'}`}
                                 />
                                 {malo && <p className="mt-1 text-xs font-medium text-danger-600">Entre 0 y 10</p>}
                             </div>

@@ -4,7 +4,7 @@
         {
             "asignatura": "Matemática",
             "temas": [
-                { "nombre": "Fracciones", "subtemas": ["Fracciones equivalentes", "Operaciones con fracciones"] },
+                { "nombre": "Fracciones", "subtemas": ["Fracciones equivalentes", "Operaciones con fracciones", "Fracciones Mixtas"] },
                 { "nombre": "Números decimales", "subtemas": [] },
                 { "nombre": "Proporcionalidad", "subtemas": [] }
             ]

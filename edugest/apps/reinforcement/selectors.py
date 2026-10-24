@@ -49,7 +49,7 @@ def planes_base(user):
 def planes_visibles(user):
     return (
         planes_base(user)
-        .select_related("estudiante__paralelo__grado", "asignatura", "docente")
+        .select_related("estudiante__paralelo__grado", "asignatura", "docente", "revisado_por")
         .prefetch_related(PLAN_PREFETCH)
     )
 

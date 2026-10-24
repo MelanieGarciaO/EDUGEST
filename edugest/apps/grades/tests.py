@@ -438,7 +438,10 @@ class DesempenoTests(GradesBase):
         sub = self.por_nombre(fracciones["subtemas"])["Fracciones equivalentes"]
         self.assertEqual((sub["promedio"], sub["nivel"]), ("8.00", "ALCANZA"))
         # Pero la dificultad se evalúa solo con las notas propias del tema (6.0).
-        self.assertEqual(fracciones["dificultad"], {"nivel": "MODERADA", "estado": "DETECTADA"})
+        self.assertEqual(
+            fracciones["dificultad"],
+            {"nivel": "MODERADA", "estado": "DETECTADA", "reincidente": False, "veces_detectada": 1},
+        )
         self.assertIsNone(sub["dificultad"])
 
         lengua = asignaturas["Lengua y Literatura"]

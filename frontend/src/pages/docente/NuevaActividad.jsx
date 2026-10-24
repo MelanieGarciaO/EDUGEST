@@ -20,6 +20,15 @@ function aviso(confianza, vacio) {
     return undefined
 }
 
+/**
+ * Fallback manual: un campo va en amarillo si está vacío o el PLN lo extrajo con
+ * confianza baja y el docente aún no lo ha cambiado. Al completarlo, el amarillo se quita.
+ */
+function requiereAtencion(valor, confianza, original) {
+    if (!String(valor ?? '').trim()) return true
+    return confianza === 'baja' && valor === original
+}
+
 export default function NuevaActividad() {
     const navigate = useNavigate()
     const qc = useQueryClient()
@@ -127,6 +136,12 @@ export default function NuevaActividad() {
     const p = prev.propuesta
     const vacio = (k) => p.campos_vacios?.includes(k)
     const f = err.fields
+    const atencion = {
+        asignatura: requiereAtencion(form.asignatura, p.confianza?.asignatura, p.asignatura ? String(p.asignatura) : ''),
+        descripcion: requiereAtencion(form.descripcion, p.confianza?.descripcion, p.descripcion ?? ''),
+        fecha_entrega: requiereAtencion(form.fecha_entrega, p.confianza?.fecha_entrega, p.fecha_entrega?.slice(0, 10) ?? ''),
+    }
+    const pendientes = Object.values(atencion).filter(Boolean).length
 
     return (
         <>
@@ -146,12 +161,20 @@ export default function NuevaActividad() {
                     </Alert>
                 )}
                 {err.message && !Object.keys(f).length && <Alert>{err.message}</Alert>}
+                {pendientes > 0 ? (
+                    <Alert tone="warn">
+                        {pendientes === 1
+                            ? 'Hay 1 campo resaltado en amarillo. Complétalo o revísalo para publicar.'
+                            : `Hay ${pendientes} campos resaltados en amarillo. Complétalos o revísalos para publicar.`}
+                    </Alert>
+                ) : null}
 
                 <SelectField
                     label="Asignatura"
                     value={form.asignatura}
                     onChange={set('asignatura')}
                     error={f.asignatura}
+                    attention={atencion.asignatura}
                     hint={aviso(p.confianza?.asignatura, vacio('asignatura') || !form.asignatura)}
                 >
                     <option value="">Selecciona una asignatura</option>
@@ -166,6 +189,7 @@ export default function NuevaActividad() {
                     value={form.descripcion}
                     onChange={set('descripcion')}
                     error={f.descripcion}
+                    attention={atencion.descripcion}
                     hint={aviso(p.confianza?.descripcion, vacio('descripcion'))}
                 />
                 <Field
@@ -175,6 +199,7 @@ export default function NuevaActividad() {
                     value={form.fecha_entrega}
                     onChange={set('fecha_entrega')}
                     error={f.fecha_entrega}
+                    attention={atencion.fecha_entrega}
                     hint={aviso(p.confianza?.fecha_entrega, vacio('fecha_entrega') || !form.fecha_entrega)}
                 />
                 <Field

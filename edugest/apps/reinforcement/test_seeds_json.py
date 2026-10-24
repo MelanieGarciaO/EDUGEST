@@ -79,11 +79,12 @@ class SeedsJsonTests(TestCase):
         call_command("seed_temas_ejemplo", grado=3, verbosity=0)
         self.assertTrue(Tema.objects.filter(grado__orden=3, nombre="Fracciones").exists())
 
-    @override_settings(GRADO_MAXIMO_HABILITADO=4)
+    @override_settings(GRADO_MINIMO_HABILITADO=5, GRADO_MAXIMO_HABILITADO=7)
     def test_grado_no_habilitado_se_rechaza_y_por_defecto_usa_el_maximo(self):
         call_command("seed_academico", verbosity=0)
-        with self.assertRaises(CommandError) as ctx:
-            call_command("seed_temas_ejemplo", grado=7, verbosity=0)
-        self.assertIn("no está habilitado", str(ctx.exception))
+        for fuera in (4, 8):
+            with self.assertRaises(CommandError) as ctx:
+                call_command("seed_temas_ejemplo", grado=fuera, verbosity=0)
+            self.assertIn("no está habilitado", str(ctx.exception))
         call_command("seed_temas_ejemplo", verbosity=0)
-        self.assertEqual(set(Tema.objects.values_list("grado__orden", flat=True)), {4})
+        self.assertEqual(set(Tema.objects.values_list("grado__orden", flat=True)), {7})
