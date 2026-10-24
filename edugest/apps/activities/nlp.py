@@ -457,6 +457,7 @@ _RE_TEMA = re.compile(
 
 
 def _buscar_tema(descripcion):
+    """Tema escrito de forma explícita: «tema: Fracciones», «sobre el tema …»."""
     m = _RE_TEMA.search(descripcion)
     if not m:
         return ""
@@ -464,10 +465,72 @@ def _buscar_tema(descripcion):
     return tema[:150]
 
 
+# Palabras que no cuentan al comparar con el catálogo de temas.
+_VACIAS_TEMA = _PALABRAS_VACIAS | {"con", "a", "al", "para", "por", "sobre", "un", "una", "lo"}
+# Palabras que, solas, no bastan para elegir un tema (aparecen en muchos nombres).
+_GENERICAS_TEMA = {"tipo", "numero", "operacion", "texto", "parte", "clase", "nocion", "elemento"}
+
+
+def _clave_tema(nombre):
+    return {
+        _normalizar(w) for w in re.findall(r"\w+", nombre) if _normalizar(w) not in _VACIAS_TEMA
+    }
+
+
+def _buscar_tema_catalogo(tokens, temas, asignatura_id, excluidos):
+    """
+    Reconoce el tema comparando la indicación con el catálogo de temas del grado
+    (temas y subtemas registrados por el administrador).
+
+    - temas: lista de (id, nombre, asignatura_id).
+    - Coincidencia completa (todas las palabras del tema aparecen, por forma o lema;
+      «fracciones» = «fracción») -> confianza alta. Gana el tema más específico (más
+      palabras): «fracciones equivalentes» antes que «fracciones».
+    - Coincidencia parcial (la mitad o más de las palabras, con alguna distintiva) ->
+      confianza media.
+    - Si la asignatura ya se reconoció, solo se buscan sus temas.
+    Devuelve (id, nombre, asignatura_id, confianza) o None.
+    """
+    palabras = {
+        p
+        for t in tokens
+        if not any(_solapa((t.inicio, t.fin), e) for e in excluidos)
+        for p in (t.norm, t.lema)
+        if p
+    }
+    if not palabras:
+        return None
+
+    candidatos = []  # (completo, n_palabras, cobertura, id, nombre, asignatura)
+    for tema_id, nombre, asig_id in temas:
+        if asignatura_id and asig_id != asignatura_id:
+            continue
+        clave = _clave_tema(nombre)
+        if not clave:
+            continue
+        halladas = clave & palabras
+        if not halladas:
+            continue
+        completo = halladas == clave
+        if not completo:
+            if len(halladas) / len(clave) < 0.5 or not (halladas - _GENERICAS_TEMA):
+                continue
+        candidatos.append((completo, len(halladas), len(halladas) / len(clave), tema_id, nombre, asig_id))
+
+    if not candidatos:
+        return None
+    candidatos.sort(key=lambda c: (c[0], c[1], c[2]), reverse=True)
+    mejor = candidatos[0]
+    empatados = [c for c in candidatos if c[:3] == mejor[:3]]
+    if len(empatados) > 1 and len({c[5] for c in empatados}) > 1:
+        return None  # el mismo tema en varias asignaturas: no se adivina
+    return mejor[3], mejor[4], mejor[5], "alta" if mejor[0] else "media"
+
+
 # ---------------------------------------------------------------------------
 # Punto de entrada
 # ---------------------------------------------------------------------------
-def extraer(texto, asignaturas, hoy, nlp=None):
+def extraer(texto, asignaturas, hoy, nlp=None, temas=None):
     """
     Procesa una indicación y devuelve un diccionario serializable con la propuesta.
 
@@ -475,6 +538,7 @@ def extraer(texto, asignaturas, hoy, nlp=None):
     - asignaturas: lista de (id, nombre) que el docente imparte en el paralelo elegido.
     - hoy: fecha actual (para resolver "mañana", "el lunes", etc.).
     - nlp: pipeline de spaCy (opcional; sin él se usa solo reglas).
+    - temas: catálogo del grado como lista de (id, nombre, asignatura_id) (opcional).
     """
     texto = " ".join(texto.split())
     advertencias = []
@@ -496,7 +560,23 @@ def extraer(texto, asignaturas, hoy, nlp=None):
     span_asignatura = None
     if encontrada:
         asignatura_id, asignatura_nombre, span_asignatura, conf_asig = encontrada
-    elif len(asignaturas) == 1:
+
+    # Tema según el catálogo del grado. Si la asignatura no se nombró, el tema la indica
+    # («fracciones» -> Matemática).
+    tema_catalogo = None
+    if temas:
+        excl_tema = [span_materiales] if span_materiales else []
+        tema_catalogo = _buscar_tema_catalogo(tokens, temas, asignatura_id, excl_tema)
+        if tema_catalogo and not asignatura_id:
+            nombres = dict(asignaturas)
+            if tema_catalogo[2] in nombres:
+                asignatura_id, asignatura_nombre = tema_catalogo[2], nombres[tema_catalogo[2]]
+                conf_asig = "media"
+                advertencias.append(
+                    f"Se asignó {asignatura_nombre} por el tema «{tema_catalogo[1]}»."
+                )
+
+    if not asignatura_id and len(asignaturas) == 1:
         asignatura_id, asignatura_nombre = asignaturas[0]
         conf_asig = "media"
         advertencias.append(
@@ -514,7 +594,16 @@ def extraer(texto, asignaturas, hoy, nlp=None):
         descripcion = texto[:1].upper() + texto[1:]
         conf_desc = "baja"
 
+    # Prioridad: tema explícito («tema: …») > tema del catálogo.
     tema = _buscar_tema(descripcion)
+    conf_tema = "alta" if tema else None
+    if tema and temas:
+        # Si el tema explícito coincide con uno del catálogo, se usa el nombre oficial.
+        oficial = _buscar_tema_catalogo(_tokenizar(tema, nlp), temas, asignatura_id, [])
+        if oficial and oficial[3] == "alta":
+            tema = oficial[1]
+    elif tema_catalogo and (not asignatura_id or tema_catalogo[2] == asignatura_id):
+        tema, conf_tema = tema_catalogo[1], tema_catalogo[3]
 
     resultado = {
         "asignatura": asignatura_id,
@@ -528,7 +617,7 @@ def extraer(texto, asignaturas, hoy, nlp=None):
             "descripcion": conf_desc,
             "fecha_entrega": conf_fecha,
             "materiales": "alta" if materiales else None,
-            "tema": "alta" if tema else None,
+            "tema": conf_tema,
         },
         "advertencias": advertencias,
         "motor": "spacy" if nlp is not None else "reglas",
