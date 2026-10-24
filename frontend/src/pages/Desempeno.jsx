@@ -3,7 +3,7 @@ import { BarChart3 } from 'lucide-react'
 
 import { Alert, Card, Chip, EmptyState, PageHeader, SelectField, Spinner, cx } from '../components/ui'
 import { LeyendaSemaforo, NivelChip } from '../components/Semaforo'
-import { formatNota } from '../lib/format'
+import { formatNota, reincidenciaLabel } from '../lib/format'
 import { useDesempeno, useEstudiantes } from '../lib/queries'
 
 const BARRA = { DOMINA: 'bg-ok-600', ALCANZA: 'bg-brand-600', PROXIMO: 'bg-warn-600', NO_ALCANZA: 'bg-danger-600' }
@@ -11,7 +11,12 @@ const BARRA = { DOMINA: 'bg-ok-600', ALCANZA: 'bg-brand-600', PROXIMO: 'bg-warn-
 function Dificultad({ d }) {
     if (!d) return null
     if (d.estado === 'SUPERADA') return <Chip tone="ok">Dificultad superada</Chip>
-    return <Chip tone="danger">Dificultad {d.nivel === 'ALTA' ? 'alta' : 'moderada'}</Chip>
+    return (
+        <>
+            <Chip tone="danger">{`Dificultad ${d.nivel === 'ALTA' ? 'alta' : 'moderada'}`}</Chip>
+            {d.reincidente ? <Chip tone="danger">{reincidenciaLabel(d.veces_detectada)}</Chip> : null}
+        </>
+    )
 }
 
 function Barra({ promedio, nivel }) {

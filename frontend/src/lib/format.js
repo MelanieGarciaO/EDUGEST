@@ -47,6 +47,9 @@ export function nivelNota(valor) {
 
 export const infoNivel = (nivel) => POR_NIVEL[nivel] ?? null
 
+/** Etiqueta de reincidencia: «Reincidente · 2.ª vez». */
+export const reincidenciaLabel = (veces) => `Reincidente · ${veces}.ª vez`
+
 /** Formatea una nota «8.5» como «8,50». */
 export const formatNota = (v) => (v == null ? '' : Number(v).toFixed(2).replace('.', ','))
 

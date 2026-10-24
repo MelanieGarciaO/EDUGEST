@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 
 import { Alert, Card, Chip, EmptyState, PageHeader, Pagination, SelectField, Spinner, Tabs } from '../components/ui'
-import { formatNota } from '../lib/format'
+import { formatNota, reincidenciaLabel } from '../lib/format'
 import { useAsignaciones, useDificultades, useEstudiantes } from '../lib/queries'
 
 const TABS = [
@@ -22,6 +22,7 @@ const fecha = (iso) => new Date(iso).toLocaleDateString('es-EC', { day: 'numeric
 export default function Dificultades() {
     const [estado, setEstado] = useState('DETECTADA')
     const [nivel, setNivel] = useState('')
+    const [reincidente, setReincidente] = useState('')
     const [estudiante, setEstudiante] = useState('')
     const [asignatura, setAsignatura] = useState('')
     const [page, setPage] = useState(1)
@@ -34,6 +35,7 @@ export default function Dificultades() {
         page,
         ...(estado !== 'todas' && { estado }),
         ...(nivel && { nivel }),
+        ...(reincidente && { reincidente }),
         ...(estudiante && { estudiante }),
         ...(asignatura && { asignatura }),
     })
@@ -49,7 +51,7 @@ export default function Dificultades() {
 
             <Tabs tabs={TABS} value={estado} label="Estado de las dificultades" onChange={(v) => { setEstado(v); setPage(1) }} />
 
-            <div className="mb-5 grid gap-3 sm:grid-cols-3">
+            <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <SelectField label="Estudiante" value={estudiante} onChange={filtro(setEstudiante)}>
                     <option value="">Todos</option>
                     {estudiantes.data?.map((e) => (
@@ -66,6 +68,11 @@ export default function Dificultades() {
                     <option value="">Todos</option>
                     <option value="ALTA">Alta</option>
                     <option value="MODERADA">Moderada</option>
+                </SelectField>
+                <SelectField label="Recurrencia" value={reincidente} onChange={filtro(setReincidente)}>
+                    <option value="">Todas</option>
+                    <option value="true">Solo reincidentes</option>
+                    <option value="false">Primera vez</option>
                 </SelectField>
             </div>
 
@@ -91,6 +98,7 @@ export default function Dificultades() {
                                         ) : (
                                             <Chip tone="danger">{d.nivel === 'ALTA' ? 'Dificultad alta' : 'Dificultad moderada'}</Chip>
                                         )}
+                                        {d.reincidente ? <Chip tone="danger">{reincidenciaLabel(d.veces_detectada)}</Chip> : null}
                                         {!superada && d.refuerzo === 'EN_CURSO' && <Chip>Plan de refuerzo en curso</Chip>}
                                         {!superada && d.refuerzo === 'PENDIENTE_EVALUACION' && <Chip tone="warn">Plan completado · pendiente de evaluación</Chip>}
                                     </div>
