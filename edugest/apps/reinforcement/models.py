@@ -102,6 +102,11 @@ class PlanRefuerzo(models.Model):
     aprobado_en = models.DateTimeField(null=True, blank=True)
     completado_en = models.DateTimeField(null=True, blank=True)
     cancelado_en = models.DateTimeField(null=True, blank=True)
+    # Acuse de recibo: el representante confirma que revisó el plan con el estudiante.
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    revisado_en = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

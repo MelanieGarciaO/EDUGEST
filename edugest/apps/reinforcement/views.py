@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from apps.academic import selectors as academic_selectors
 from apps.academic.views import filter_by_active, filter_by_id
 from apps.security.models import Role
-from apps.security.permissions import IsDocente, IsDocenteOrAdministrador, IsPasswordUpToDate
+from apps.security.permissions import IsDocente, IsDocenteOrAdministrador, IsPasswordUpToDate, IsRepresentante
 
 from . import selectors, services
 from .models import ActividadRefuerzo, EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
@@ -83,6 +83,8 @@ class PlanViewSet(viewsets.ReadOnlyModelViewSet):
                           -> propuesta de plan
       POST /{id}/aprobar/                                      -> publica el plan a la familia
       POST /{id}/cancelar/
+    Acción del representante:
+      POST /{id}/revisar/                                      -> acuse de recibo del plan
     """
 
     serializer_class = PlanSerializer
@@ -90,6 +92,8 @@ class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         if self.action in ("generar", "aprobar", "cancelar"):
             return [IsDocente()]
+        if self.action == "revisar":
+            return [IsRepresentante()]
         return [IsPasswordUpToDate()]
 
     def get_queryset(self):
@@ -149,6 +153,11 @@ class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def cancelar(self, request, pk=None):
         plan = services.cancelar_plan(self.get_object(), request.user)
+        return self._responder(request, plan.id)
+
+    @action(detail=True, methods=["post"])
+    def revisar(self, request, pk=None):
+        plan = services.marcar_revisado(self.get_object(), request.user)
         return self._responder(request, plan.id)
 
 

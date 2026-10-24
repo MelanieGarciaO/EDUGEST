@@ -311,6 +311,23 @@ def cumplir_actividad(actividad, usuario):
 
 
 @transaction.atomic
+def marcar_revisado(plan, usuario):
+    """
+    Acuse de recibo del representante: confirma que revisó el plan con el estudiante.
+    Solo para planes publicados (aprobados o completados). Es idempotente: si ya estaba
+    revisado, se conserva la primera fecha.
+    """
+    plan = PlanRefuerzo.objects.select_for_update().get(pk=plan.pk)
+    if plan.estado not in (Estado.APROBADA, Estado.COMPLETADA):
+        raise ValidationError({"detail": "Solo se puede confirmar la revisión de un plan publicado."})
+    if plan.revisado_en is None:
+        plan.revisado_en = timezone.now()
+        plan.revisado_por = usuario
+        plan.save(update_fields=["revisado_en", "revisado_por", "updated_at"])
+    return plan
+
+
+@transaction.atomic
 def reabrir_actividad(actividad, usuario):
     """Corrige un cumplimiento marcado por error (solo el docente). Devuelve (actividad, plan)."""
     plan = PlanRefuerzo.objects.select_for_update().get(pk=actividad.tema_plan.plan_id)
