@@ -14,6 +14,7 @@ from apps.security.models import Role
 
 from . import scale
 from .models import Calificacion, CalificacionHistorial, Dificultad
+from .resumen import resumen_claro
 from .signals import calificaciones_guardadas, dificultad_detectada, dificultad_superada
 
 
@@ -301,6 +302,7 @@ def desempeno_estudiante(estudiante, user):
             }
         )
 
+    promedio_general = scale.promedio(c.valor for c in califs)
     return {
         "estudiante": {
             "id": estudiante.id,
@@ -308,4 +310,6 @@ def desempeno_estudiante(estudiante, user):
             "paralelo": estudiante.paralelo.nombre_completo,
         },
         "asignaturas": resultado,
+        # Lectura en lenguaje claro para la familia (mejora 8).
+        "resumen": resumen_claro(estudiante.first_name, resultado, promedio_general),
     }
