@@ -7,10 +7,14 @@ corrige antes de publicar, y lo que no se pueda identificar se deja vacío.
 
 Papel de cada herramienta:
 - spaCy (modelo `es_core_news_sm`): tokenización y lematización del texto, usadas para
-  reconocer la asignatura aunque se escriba en plural, con tildes o abreviada.
-- Reglas y expresiones regulares: fechas (relativas y explícitas), materiales y limpieza
-  de la descripción. El modelo de spaCy en español no reconoce fechas, por eso esta
-  parte es propia.
+  reconocer la asignatura y el tema aunque se escriban en plural, con tildes o abreviados.
+- EntityRuler de spaCy (ner.py): reconoce MATERIALES (útiles escolares) y alias de
+  ASIGNATURAS («lenguaje», «gimnasia»…). Sirve para recortar la lista de materiales
+  («traer goma para la actividad» -> «goma») y para reconocer materiales tras verbos
+  de uso («usar regla y compás»).
+- Reglas y expresiones regulares: fechas (relativas y explícitas), disparadores de
+  materiales y limpieza de la descripción. El modelo de spaCy en español no reconoce
+  fechas, por eso esta parte es propia.
 - Respaldo ("fallback"): si el modelo de spaCy no está instalado, el motor sigue
   funcionando con una tokenización simple y devuelve `motor = "reglas"`.
 
@@ -26,6 +30,8 @@ from datetime import date, timedelta
 from functools import lru_cache
 
 from django.conf import settings
+
+from . import ner
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +53,9 @@ def obtener_nlp():
     try:
         import spacy
 
-        return spacy.load(nombre, exclude=["ner", "parser"])
+        # El NER estadístico del modelo no conoce útiles escolares ni asignaturas: se
+        # reemplaza por un EntityRuler con patrones propios (ver ner.py).
+        return ner.agregar_a_pipeline(spacy.load(nombre, exclude=["ner", "parser"]))
     except Exception as exc:  # modelo no instalado, spaCy ausente, etc.
         logger.warning("spaCy no disponible (%s); se usarán solo reglas.", exc)
         return None
@@ -331,16 +339,74 @@ _RE_ANTES_DE_MATERIALES = re.compile(
     r"(?:\s*[,;]|\s+y|\s+e)?\s*(?:(?:no\s+olviden|recuerden|por\s+favor|favor)\s*)?$",
     _FLAGS,
 )
+# Verbos de uso: solo aportan materiales reconocidos por el NER («usar regla y compás»).
+_RE_MATERIALES_USO = re.compile(
+    r"(?<!\w)(?:usar|usen|utilizar|utilicen|necesitan|necesitarán|necesitaremos|ocupar|ocupen)"
+    r"(?!\w)\s*:?\s*",
+    _FLAGS,
+)
+# Palabras que indican que, tras el material, empieza otra cosa («goma para la actividad…»).
+_CONECTORES_TRAS_MATERIAL = {
+    "para", "en", "que", "con", "a", "al", "del", "de", "sobre", "por", "durante", "hasta",
+    "y", "e", "como", "donde", "porque",
+}
 _RE_FIN_DE_LISTA = re.compile(r"\.(?:\s|$)")
 _RE_SEPARADOR_ITEMS = re.compile(r"\s*(?:,|;|\s+y\s+|\s+e\s+)\s*", _FLAGS)
 _RE_ARTICULO_INICIAL = re.compile(r"^(?:el|la|los|las|un|una|unos|unas|su|sus)\s+", _FLAGS)
 
 
-def _buscar_materiales(texto, spans_fecha):
-    """Devuelve (lista_de_materiales, tramo_a_quitar | None)."""
+def _recortar_material(item, materiales_ner):
+    """
+    Si el ítem empieza con un material reconocido y luego sigue texto que no es parte del
+    material («goma para la actividad de recorte»), devuelve (material, resto); si no,
+    (ítem, "").
+    """
+    bajo = item.lower()
+    for nombre in sorted(materiales_ner, key=len, reverse=True):
+        if bajo.startswith(nombre) and (len(bajo) == len(nombre) or not bajo[len(nombre)].isalnum()):
+            resto = item[len(nombre):].strip()
+            primera = resto.split()[0].lower() if resto else ""
+            if resto and primera in _CONECTORES_TRAS_MATERIAL:
+                return item[: len(nombre)], resto
+            return item, ""
+    return item, ""
+
+
+def _items(segmento):
+    items, vistos = [], set()
+    for crudo in _RE_SEPARADOR_ITEMS.split(segmento):
+        item = _RE_ARTICULO_INICIAL.sub("", crudo.strip()).strip(" .,:;")
+        if item and item.lower() not in vistos:
+            vistos.add(item.lower())
+            items.append(item)
+    return items
+
+
+def _buscar_materiales(texto, spans_fecha, entidades=()):
+    """
+    Devuelve (lista_de_materiales, tramo_a_quitar | None, confianza | None).
+
+    1) Con disparador («traer», «materiales:»…): se toma la lista que sigue. El NER recorta
+       el texto que no es material («traer goma para la actividad» -> «goma»).
+    2) Con verbo de uso («usar regla y compás para medir»): solo los materiales que el NER
+       reconoce; la descripción no se recorta (el verbo es parte de la tarea).
+    """
+    materiales_ner = {e.texto.lower() for e in entidades if e.etiqueta == "MATERIAL"}
     m = _RE_MATERIALES.search(texto)
     if not m:
-        return [], None
+        uso = _RE_MATERIALES_USO.search(texto)
+        if not uso:
+            return [], None, None
+        fin = _RE_FIN_DE_LISTA.search(texto, uso.end())
+        segmento = _sin_spans(texto, spans_fecha, desde=uso.end(), hasta=fin.start() if fin else len(texto))
+        items = []
+        for item in _items(segmento):
+            material, resto = _recortar_material(item, materiales_ner)
+            if material.lower() in materiales_ner:
+                items.append(material[:100])
+            if resto:
+                break  # después del primer material con complemento ya no es una lista
+        return items, None, ("media" if items else None)
 
     fin_lista = len(texto)
     corte = _RE_FIN_DE_LISTA.search(texto, m.end())
@@ -348,19 +414,22 @@ def _buscar_materiales(texto, spans_fecha):
         fin_lista = corte.start()
 
     segmento = _sin_spans(texto, spans_fecha, desde=m.end(), hasta=fin_lista)
-    items, vistos = [], set()
-    for crudo in _RE_SEPARADOR_ITEMS.split(segmento):
-        item = _RE_ARTICULO_INICIAL.sub("", crudo.strip()).strip(" .,:;")
-        clave = item.lower()
-        if item and clave not in vistos:
-            vistos.add(clave)
-            items.append(item[:100])
+    items = []
+    for item in _items(segmento):
+        material, resto = _recortar_material(item, materiales_ner)
+        items.append(material[:100])
+        if resto:
+            # El resto vuelve a la descripción: la lista termina donde empieza.
+            pos = texto.find(resto, m.end(), fin_lista + 1)
+            if pos != -1:
+                fin_lista = pos
+            break
     if not items:
-        return [], None
+        return [], None, None
 
     previo = _RE_ANTES_DE_MATERIALES.search(texto[: m.start()])
     inicio = previo.start() if previo else m.start()
-    return items, (inicio, fin_lista)
+    return items, (inicio, fin_lista), "alta"
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +515,23 @@ def _buscar_asignatura(texto, tokens, asignaturas, excluidos):
         confianza = "media"
         aviso = f"También se menciona {', '.join(otras)}; verifica la asignatura."
     return (asig_id, nombre, (ini, fin), confianza), aviso
+
+
+def _asignatura_por_alias(texto, entidades, asignaturas, excluidos):
+    """Asignatura nombrada con un alias del NER; (id, nombre, span) o None si es ambiguo."""
+    for e in entidades:
+        if e.etiqueta != "ASIGNATURA" or any(_solapa((e.inicio, e.fin), x) for x in excluidos):
+            continue
+        coinciden = [
+            (asig_id, nombre)
+            for asig_id, nombre in asignaturas
+            if e.clave in {_normalizar(w) for w in re.findall(r"\w+", nombre)}
+        ]
+        if len(coinciden) == 1:
+            previo = _RE_ANTES_DE_ASIGNATURA.search(texto[: e.inicio])
+            ini = previo.start() if previo else e.inicio
+            return coinciden[0][0], coinciden[0][1], (ini, e.fin)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -546,7 +632,9 @@ def extraer(texto, asignaturas, hoy, nlp=None, temas=None):
     fecha, conf_fecha, spans_fecha, adv = _buscar_fecha(texto, hoy)
     advertencias.extend(adv)
 
-    materiales, span_materiales = _buscar_materiales(texto, spans_fecha)
+    # NER (EntityRuler con spaCy o los mismos patrones sin spaCy).
+    entidades = ner.buscar(texto, nlp)
+    materiales, span_materiales, conf_materiales = _buscar_materiales(texto, spans_fecha, entidades)
 
     excluidos = list(spans_fecha)
     if span_materiales:
@@ -560,6 +648,12 @@ def extraer(texto, asignaturas, hoy, nlp=None, temas=None):
     span_asignatura = None
     if encontrada:
         asignatura_id, asignatura_nombre, span_asignatura, conf_asig = encontrada
+    else:
+        # Alias reconocido por el NER: «lenguaje» -> Lengua y Literatura, «gimnasia» -> E. Física.
+        alias = _asignatura_por_alias(texto, entidades, asignaturas, excluidos)
+        if alias:
+            asignatura_id, asignatura_nombre, span_asignatura = alias
+            conf_asig = "media"
 
     # Tema según el catálogo del grado. Si la asignatura no se nombró, el tema la indica
     # («fracciones» -> Matemática).
@@ -616,7 +710,7 @@ def extraer(texto, asignaturas, hoy, nlp=None, temas=None):
             "asignatura": conf_asig,
             "descripcion": conf_desc,
             "fecha_entrega": conf_fecha,
-            "materiales": "alta" if materiales else None,
+            "materiales": conf_materiales,
             "tema": conf_tema,
         },
         "advertencias": advertencias,

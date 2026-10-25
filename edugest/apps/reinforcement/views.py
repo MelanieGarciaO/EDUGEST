@@ -4,13 +4,20 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.academic import selectors as academic_selectors
 from apps.academic.views import filter_by_active, filter_by_id
 from apps.security.models import Role
-from apps.security.permissions import IsDocente, IsDocenteOrAdministrador, IsPasswordUpToDate, IsRepresentante
+from apps.security.permissions import (
+    IsAdministrador,
+    IsDocente,
+    IsDocenteOrAdministrador,
+    IsPasswordUpToDate,
+    IsRepresentante,
+)
 
-from . import selectors, services
+from . import alerta, selectors, services
 from .models import ActividadRefuerzo, EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
 from .permissions import IsDocenteOrRepresentante
 from .serializers import (
@@ -240,3 +247,12 @@ class ActividadRefuerzoViewSet(viewsets.GenericViewSet):
     def reabrir(self, request, pk=None):
         actividad, plan = services.reabrir_actividad(self.get_object(), request.user)
         return self._respuesta_seguimiento(actividad, plan)
+
+
+class AlertaTempranaView(APIView):
+    """GET: tablero de alerta temprana institucional (solo administrador)."""
+
+    permission_classes = [IsAdministrador]
+
+    def get(self, request):
+        return Response(alerta.alerta_temprana())
