@@ -2,6 +2,7 @@ import { CheckCircle2, Circle, Clock } from 'lucide-react'
 
 import { ESTRATEGIA_LABEL, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
 import { Card, Chip, cx } from './ui'
+import Evidencias from './Evidencias'
 
 const fecha = (iso) => new Date(iso).toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -94,8 +95,11 @@ function TemaEvaluacion({ tema: t }) {
     )
 }
 
-/** Temas del plan con su objetivo y actividades. `actions(actividad, plan)` agrega botones por actividad y `temaActions(tema, plan)` botones del tema. */
-export function PlanTemas({ plan, actions, temaActions }) {
+/**
+ * Temas del plan con su objetivo y actividades. `actions(actividad, plan)` agrega botones por actividad,
+ * `temaActions(tema, plan)` botones del tema y `evidencias` ('ver' | 'subir') muestra las fotos de evidencia.
+ */
+export function PlanTemas({ plan, actions, temaActions, evidencias }) {
     return (
         <div className="space-y-5">
             {plan.temas.map((t) => {
@@ -171,6 +175,7 @@ export function PlanTemas({ plan, actions, temaActions }) {
                                                         </p>
                                                     )}
                                                     {acciones && <div className="mt-2 flex flex-wrap gap-2">{acciones}</div>}
+                                                    {evidencias ? <Evidencias actividad={a} plan={plan} modo={evidencias} /> : null}
                                                 </div>
                                             </div>
                                         </li>
