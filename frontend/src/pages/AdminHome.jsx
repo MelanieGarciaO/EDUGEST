@@ -1,4 +1,5 @@
 import { useAuth } from '../auth/AuthContext'
+import AlertaTemprana from '../components/AlertaTemprana'
 import { Card, PageHeader, Spinner } from '../components/ui'
 import { useCount } from '../lib/queries'
 
@@ -32,6 +33,10 @@ export default function AdminHome() {
                 <Stat label="Estudiantes" query={estudiantes} />
                 <Stat label="Paralelos" query={paralelos} />
             </div>
+
+            <h2 className="mt-8 mb-1 text-xl font-extrabold text-navy-800">Alerta temprana</h2>
+            <p className="mb-4 text-sm text-ink-500">Dónde se concentran las dificultades de aprendizaje en la institución.</p>
+            <AlertaTemprana />
         </>
     )
 }
