@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, History, Save } from 'lucide-react'
+import { ArrowLeft, FileDown, FileUp, History, Save } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { Alert, Button, Card, Chip, PageHeader, SelectField, Spinner } from '../../components/ui'
@@ -40,6 +40,60 @@ export default function Calificar() {
     const [result, setResult] = useState(null)
     const [err, setErr] = useState(null)
     const [historial, setHistorial] = useState(null) // id de la calificación abierta
+    const [importado, setImportado] = useState(null) // vista previa del Excel
+    const [excelError, setExcelError] = useState('')
+    const [descargando, setDescargando] = useState(false)
+    const archivoRef = useRef(null)
+
+    // Mejora 9: plantilla Excel fija.
+    async function descargarPlantilla() {
+        setExcelError('')
+        setDescargando(true)
+        try {
+            const res = await api.get(`/grades/actividades/${id}/calificaciones/plantilla/`, { responseType: 'blob' })
+            const nombre = /filename="([^"]+)"/.exec(res.headers['content-disposition'] ?? '')?.[1] ?? 'plantilla_notas.xlsx'
+            const url = URL.createObjectURL(res.data)
+            const enlace = document.createElement('a')
+            enlace.href = url
+            enlace.download = nombre
+            enlace.click()
+            URL.revokeObjectURL(url)
+        } catch {
+            setExcelError('No se pudo descargar la plantilla. Intenta de nuevo.')
+        } finally {
+            setDescargando(false)
+        }
+    }
+
+    const importar = useMutation({
+        mutationFn: async (archivo) => {
+            const datos = new FormData()
+            datos.append('archivo', archivo)
+            // Sin esta cabecera, axios convertiría el FormData a JSON (el cliente usa JSON por defecto).
+            return (
+                await api.post(`/grades/actividades/${id}/calificaciones/importar/`, datos, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                })
+            ).data
+        },
+        onMutate: () => {
+            setExcelError('')
+            setImportado(null)
+            setResult(null)
+        },
+        onSuccess: (data) => {
+            // Solo llena el formulario: el docente revisa y guarda con el botón de siempre.
+            setValores((v) => ({ ...v, ...Object.fromEntries(data.filas.map((f) => [f.estudiante, formatNota(f.valor)])) }))
+            setImportado(data)
+        },
+        onError: (e) => {
+            const { message, fields } = parseApiError(e)
+            setExcelError(fields.archivo ?? message)
+        },
+        onSettled: () => {
+            if (archivoRef.current) archivoRef.current.value = ''
+        },
+    })
 
     // Evaluación de refuerzo: estudiantes con plan completado esperando esta nota.
     const esEvaluacion = !!actividad.data?.es_evaluacion_refuerzo
@@ -82,6 +136,7 @@ export default function Calificar() {
         onSuccess: (data) => {
             setResult(data)
             setErr(null)
+            setImportado(null)
             qc.invalidateQueries({ queryKey: ['notas-actividad', id] })
             qc.invalidateQueries({ queryKey: ['planes'] })
             qc.invalidateQueries({ queryKey: ['plan'] })
@@ -166,6 +221,50 @@ export default function Calificar() {
                 {temas.isSuccess && temasDeLaActividad.length === 0 && (
                     <Alert tone="warn" className="mt-3">Esta asignatura no tiene temas para el grado. Pide al administrador que los registre.</Alert>
                 )}
+            </Card>
+
+            <Card className="mb-5 max-w-3xl">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-60">
+                        <p className="font-bold text-navy-800">Cargar notas desde Excel</p>
+                        <p className="text-sm text-ink-500">Descarga la plantilla, escribe las notas en la columna «Nota» y súbela. Podrás revisarlas antes de guardar.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="secondary" onClick={descargarPlantilla} loading={descargando}>
+                            <FileDown className="size-4" aria-hidden="true" />
+                            Plantilla
+                        </Button>
+                        <Button variant="secondary" onClick={() => archivoRef.current?.click()} loading={importar.isPending} disabled={bloqueada}>
+                            <FileUp className="size-4" aria-hidden="true" />
+                            Subir Excel
+                        </Button>
+                        <input
+                            ref={archivoRef}
+                            type="file"
+                            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            className="sr-only"
+                            aria-label="Archivo Excel con las notas"
+                            onChange={(e) => e.target.files?.[0] && importar.mutate(e.target.files[0])}
+                        />
+                    </div>
+                </div>
+                {excelError ? <Alert className="mt-3">{excelError}</Alert> : null}
+                {importado ? (
+                    <Alert tone={importado.errores.length ? 'warn' : 'ok'} className="mt-3">
+                        <p>
+                            {`Se cargaron ${importado.filas.length} ${importado.filas.length === 1 ? 'nota' : 'notas'} desde Excel`}
+                            {importado.sin_nota ? ` (${importado.sin_nota} sin nota)` : ''}
+                            {'. Revisa, elige el tema y pulsa «Guardar notas».'}
+                        </p>
+                        {importado.errores.length > 0 ? (
+                            <ul className="mt-1 list-disc pl-5 font-normal">
+                                {importado.errores.map((e) => (
+                                    <li key={`${e.fila}-${e.mensaje}`}>{`Fila ${e.fila}: ${e.mensaje}`}</li>
+                                ))}
+                            </ul>
+                        ) : null}
+                    </Alert>
+                ) : null}
             </Card>
 
             <LeyendaSemaforo className="mb-3 max-w-3xl" />
