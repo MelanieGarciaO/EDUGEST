@@ -98,16 +98,18 @@ class ImportarTests(ExcelBase):
 
     def test_archivo_no_excel_se_rechaza(self):
         self.assertEqual(self.subir(b"hola", nombre="notas.csv").status_code, 400)
+        self.assertEqual(self.subir(b"hola", nombre="notas.pdf").status_code, 400)
         self.assertEqual(self.subir(b"no es excel", nombre="notas.xlsx").status_code, 400)
 
-    def test_columnas_cambiadas_se_rechaza(self):
-        wb = load_workbook(BytesIO(self.descargar().content))
+    def test_columnas_cambiadas_usa_el_mapeo_inteligente(self):
+        wb = load_workbook(BytesIO(self.llenar({self.est1.id: 9})))
         wb[excel.HOJA].cell(row=excel.FILA_ENCABEZADO, column=1, value="Código")
         salida = BytesIO()
         wb.save(salida)
         res = self.subir(salida.getvalue())
-        self.assertEqual(res.status_code, 400)
-        self.assertIn("formato", str(res.data))
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(res.data["modo"], "mapeo")
+        self.assertEqual([f["estudiante"] for f in res.data["filas"]], [self.est1.id])
 
     def test_otro_docente_no_puede_importar(self):
         res = self.subir(self.llenar({self.est1.id: 9}), user=self.doc2)

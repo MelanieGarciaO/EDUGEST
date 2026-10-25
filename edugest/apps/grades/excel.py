@@ -1,5 +1,6 @@
 """
-Carga de notas con plantilla Excel fija (mejora 9).
+Carga de notas desde Excel (mejora 9: plantilla fija; mejora 12: cualquier planilla, ver
+mapeo.py).
 
 1. El docente descarga la plantilla de la actividad: trae la nómina del paralelo
    (ID y nombre bloqueados) y una columna «Nota» editable, con las notas actuales.
@@ -15,6 +16,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Protection
 from openpyxl.worksheet.datavalidation import DataValidation
 from rest_framework.exceptions import ValidationError
+
+from . import mapeo
 
 TAMANO_MAXIMO = 2 * 1024 * 1024  # 2 MB
 HOJA = "Notas"
@@ -107,40 +110,47 @@ def _leer_nota(valor):
     return nota.quantize(Decimal("0.01"))
 
 
-def leer_plantilla(archivo, actividad, estudiantes):
+def leer_archivo(archivo, actividad, estudiantes, columna_nota=None):
     """
-    Valida el archivo y devuelve la vista previa:
-    {"filas": [{estudiante, estudiante_nombre, valor}], "errores": [{fila, mensaje}],
-     "sin_nota": n}
+    Lee un archivo de notas y devuelve la vista previa (no guarda nada).
+    - Plantilla de EduGest (.xlsx) -> lectura exacta por ID (modo «plantilla»).
+    - Cualquier otro .xlsx o .csv  -> mapeo inteligente de columnas (modo «mapeo»).
     """
     if not archivo:
-        raise ValidationError({"archivo": "Adjunta el archivo Excel de la plantilla."})
-    if not archivo.name.lower().endswith(".xlsx"):
-        raise ValidationError({"archivo": "El archivo debe ser .xlsx (la plantilla de EduGest)."})
+        raise ValidationError({"archivo": "Adjunta el archivo Excel o CSV con las notas."})
+    nombre = archivo.name.lower()
+    if not nombre.endswith((".xlsx", ".csv")):
+        raise ValidationError({"archivo": "El archivo debe ser .xlsx o .csv."})
     if archivo.size > TAMANO_MAXIMO:
         raise ValidationError({"archivo": "El archivo supera los 2 MB."})
+
+    if nombre.endswith(".csv"):
+        return mapeo.importar_tabla(mapeo.filas_csv(archivo.read()), estudiantes, columna_nota)
 
     try:
         wb = load_workbook(archivo, data_only=True, read_only=False)
     except Exception:  # archivo dañado o que no es Excel
-        raise ValidationError({"archivo": "No se pudo leer el archivo. Usa la plantilla descargada."}) from None
+        raise ValidationError({"archivo": "No se pudo leer el archivo. Revisa que sea un Excel válido."}) from None
 
-    if HOJA not in wb.sheetnames:
-        raise ValidationError({"archivo": f"No se encontró la hoja «{HOJA}». Usa la plantilla descargada."})
     if HOJA_META in wb.sheetnames and wb[HOJA_META]["B1"].value not in (None, actividad.id):
         raise ValidationError(
             {"archivo": "Esta plantilla es de otra actividad. Descarga la de esta actividad."}
         )
+    if not _es_plantilla(wb):
+        return mapeo.importar_tabla(mapeo.filas_xlsx(wb), estudiantes, columna_nota)
+    return _leer_plantilla(wb, estudiantes)
 
+
+def _es_plantilla(wb):
+    if HOJA not in wb.sheetnames:
+        return False
     ws = wb[HOJA]
-    encabezado = tuple(
-        str(ws.cell(row=FILA_ENCABEZADO, column=c).value or "").strip() for c in (1, 2, 3)
-    )
-    if encabezado[0] != "ID" or not encabezado[2].startswith("Nota"):
-        raise ValidationError(
-            {"archivo": "El formato no coincide con la plantilla. No cambies las columnas."}
-        )
+    encabezado = [str(ws.cell(row=FILA_ENCABEZADO, column=c).value or "").strip() for c in (1, 3)]
+    return encabezado[0] == "ID" and encabezado[1].startswith("Nota")
 
+
+def _leer_plantilla(wb, estudiantes):
+    ws = wb[HOJA]
     nombres = {e.id: e.full_name for e in estudiantes}
     filas, errores, vistos, sin_nota = [], [], set(), 0
     for n, (id_celda, _nombre, nota_celda) in enumerate(
@@ -171,4 +181,4 @@ def leer_plantilla(archivo, actividad, estudiantes):
             continue
         filas.append({"estudiante": est_id, "estudiante_nombre": nombres[est_id], "valor": str(valor)})
 
-    return {"filas": filas, "errores": errores, "sin_nota": sin_nota}
+    return {"modo": "plantilla", "filas": filas, "errores": errores, "sin_nota": sin_nota}

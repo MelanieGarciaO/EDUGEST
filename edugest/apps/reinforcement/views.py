@@ -1,9 +1,11 @@
 from django.db.models import Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 
 from apps.academic import selectors as academic_selectors
@@ -17,10 +19,11 @@ from apps.security.permissions import (
     IsRepresentante,
 )
 
-from . import alerta, selectors, services
+from . import alerta, evidencias, selectors, services
 from .models import ActividadRefuerzo, EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
 from .permissions import IsDocenteOrRepresentante
 from .serializers import (
+    EvidenciaSerializer,
     ActividadRefuerzoEditarSerializer,
     ActividadRefuerzoSerializer,
     AgregarActividadSerializer,
@@ -207,12 +210,15 @@ class ActividadRefuerzoViewSet(viewsets.GenericViewSet):
       DELETE /{id}/          (docente, solo en propuesta) quita la actividad
       POST   /{id}/cumplir/  (docente o representante, plan aprobado) marca como cumplida
       POST   /{id}/reabrir/  (solo docente) corrige un cumplimiento marcado por error
+      GET    /{id}/evidencias/  (docente o representante) fotos de la actividad
+      POST   /{id}/evidencias/  (representante, multipart «archivo» + «comentario») sube una foto
     """
 
     serializer_class = ActividadRefuerzoSerializer
+    parser_classes = [JSONParser, MultiPartParser]
 
     def get_permissions(self):
-        if self.action == "cumplir":
+        if self.action in ("cumplir", "evidencias"):
             return [IsDocenteOrRepresentante()]
         return [IsDocente()]
 
@@ -243,6 +249,20 @@ class ActividadRefuerzoViewSet(viewsets.GenericViewSet):
         actividad, plan = services.cumplir_actividad(self.get_object(), request.user)
         return self._respuesta_seguimiento(actividad, plan)
 
+    @action(detail=True, methods=["get", "post"])
+    def evidencias(self, request, pk=None):
+        actividad = self.get_object()
+        if request.method == "POST":
+            evidencias.subir(
+                actividad, request.user, request.FILES.get("archivo"), request.data.get("comentario", "")
+            )
+            actividad = self.get_queryset().get(pk=actividad.pk)
+            return Response(
+                EvidenciaSerializer(actividad.evidencias.all(), many=True).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(EvidenciaSerializer(actividad.evidencias.all(), many=True).data)
+
     @action(detail=True, methods=["post"])
     def reabrir(self, request, pk=None):
         actividad, plan = services.reabrir_actividad(self.get_object(), request.user)
@@ -256,3 +276,34 @@ class AlertaTempranaView(APIView):
 
     def get(self, request):
         return Response(alerta.alerta_temprana())
+
+
+class EvidenciaViewSet(viewsets.GenericViewSet):
+    """
+    Evidencias fotográficas (mejora 14).
+      GET    /{id}/archivo/  (docente o representante del plan) entrega la foto
+      DELETE /{id}/          (quien la subió, plan en curso) la elimina
+    Las fotos nunca tienen URL pública: se entregan solo por aquí, con autenticación.
+    """
+
+    serializer_class = EvidenciaSerializer
+
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [IsRepresentante()]
+        return [IsDocenteOrRepresentante()]
+
+    def get_queryset(self):
+        return selectors.evidencias_visibles(self.request.user)
+
+    def destroy(self, request, pk=None):
+        evidencias.eliminar(self.get_object(), request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def archivo(self, request, pk=None):
+        evidencia = self.get_object()
+        respuesta = FileResponse(evidencia.archivo.open("rb"), content_type="image/jpeg")
+        respuesta["Cache-Control"] = "private, max-age=300"
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        return respuesta

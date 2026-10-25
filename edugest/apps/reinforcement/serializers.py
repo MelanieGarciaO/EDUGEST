@@ -5,16 +5,34 @@ from apps.grades.models import Dificultad
 from apps.security.models import Role
 
 from . import selectors
-from .models import ActividadRefuerzo, EstrategiaRefuerzo, PlanRefuerzo, RecursoRefuerzo, TemaPlan
+from .models import (
+    ActividadRefuerzo,
+    EstrategiaRefuerzo,
+    EvidenciaActividad,
+    PlanRefuerzo,
+    RecursoRefuerzo,
+    TemaPlan,
+)
 
 
 # ---------------------------------------------------------------------------
 # Lectura de planes
 # ---------------------------------------------------------------------------
+class EvidenciaSerializer(serializers.ModelSerializer):
+    subida_por_nombre = serializers.CharField(source="subida_por.full_name", read_only=True)
+    subida_por = serializers.IntegerField(source="subida_por_id", read_only=True)
+
+    class Meta:
+        model = EvidenciaActividad
+        fields = ("id", "actividad", "comentario", "tamano", "subida_por", "subida_por_nombre", "created_at")
+        read_only_fields = fields
+
+
 class ActividadRefuerzoSerializer(serializers.ModelSerializer):
     cumplida_por_nombre = serializers.CharField(
         source="cumplida_por.full_name", read_only=True, allow_null=True
     )
+    evidencias = EvidenciaSerializer(many=True, read_only=True)
 
     class Meta:
         model = ActividadRefuerzo
@@ -32,6 +50,7 @@ class ActividadRefuerzoSerializer(serializers.ModelSerializer):
             "cumplida_en",
             "cumplida_por",
             "cumplida_por_nombre",
+            "evidencias",
         )
         read_only_fields = fields
 

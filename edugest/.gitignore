@@ -39,3 +39,5 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+# Evidencias locales (fotos de estudiantes): nunca al repositorio
+privado/

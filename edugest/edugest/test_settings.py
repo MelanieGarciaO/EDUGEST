@@ -24,3 +24,9 @@ logging.disable(logging.WARNING)
 # Las pruebas existentes usan grados altos (7.º y 8.º); la restricción se prueba aparte.
 GRADO_MINIMO_HABILITADO = 1
 GRADO_MAXIMO_HABILITADO = 10
+
+# Las evidencias se guardan en memoria: las pruebas nunca tocan Supabase ni el disco.
+STORAGES = {
+    **STORAGES,  # noqa: F405
+    "evidencias": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
+}

@@ -16,7 +16,7 @@ from apps.academic.views import filter_by_id
 from apps.activities import selectors as activities_selectors
 from apps.security.permissions import IsDocente, IsDocenteOrAdministrador, IsPasswordUpToDate
 
-from . import excel, scale, services
+from . import excel, scale, services, texto_libre
 from .models import Calificacion, Dificultad
 from .selectors import calificaciones_visibles, dificultades_visibles
 from .serializers import (
@@ -169,8 +169,9 @@ class PlantillaCalificacionesView(_ActividadDocenteMixin, APIView):
 
 class ImportarCalificacionesView(_ActividadDocenteMixin, APIView):
     """
-    POST (multipart, campo «archivo»): valida la plantilla llena y devuelve una vista
-    previa de las notas. NO guarda: el docente revisa y guarda con el flujo normal.
+    POST (multipart, campo «archivo», opcional «columna_nota»): lee la plantilla de EduGest
+    o cualquier Excel/CSV (mapeo inteligente) y devuelve una vista previa de las notas.
+    NO guarda: el docente revisa y guarda con el flujo normal.
     """
 
     parser_classes = [MultiPartParser]
@@ -178,7 +179,26 @@ class ImportarCalificacionesView(_ActividadDocenteMixin, APIView):
     def post(self, request, actividad_id):
         actividad, estudiantes = self._actividad_y_estudiantes(request, actividad_id)
         services.verificar_calificable(actividad)
-        return Response(excel.leer_plantilla(request.FILES.get("archivo"), actividad, estudiantes))
+        columna = request.data.get("columna_nota")
+        try:
+            columna = int(columna) if columna not in (None, "") else None
+        except (TypeError, ValueError):
+            raise ValidationError({"columna_nota": "Columna no válida."}) from None
+        return Response(
+            excel.leer_archivo(request.FILES.get("archivo"), actividad, estudiantes, columna)
+        )
+
+
+class TextoCalificacionesView(_ActividadDocenteMixin, APIView):
+    """
+    POST {"texto": "Vera 9, Gómez 4,5"}: interpreta notas escritas en texto libre y
+    devuelve una vista previa (mejora 13). NO guarda.
+    """
+
+    def post(self, request, actividad_id):
+        actividad, estudiantes = self._actividad_y_estudiantes(request, actividad_id)
+        services.verificar_calificable(actividad)
+        return Response(texto_libre.interpretar(request.data.get("texto", ""), estudiantes))
 
 
 class CalificacionViewSet(viewsets.ReadOnlyModelViewSet):
