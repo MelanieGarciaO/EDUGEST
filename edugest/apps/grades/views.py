@@ -1,10 +1,12 @@
 from django.apps import apps
 from django.db.models import Exists, OuterRef
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -14,7 +16,7 @@ from apps.academic.views import filter_by_id
 from apps.activities import selectors as activities_selectors
 from apps.security.permissions import IsDocente, IsDocenteOrAdministrador, IsPasswordUpToDate
 
-from . import scale, services
+from . import excel, scale, services, texto_libre
 from .models import Calificacion, Dificultad
 from .selectors import calificaciones_visibles, dificultades_visibles
 from .serializers import (
@@ -133,6 +135,72 @@ class ActividadCalificacionesView(APIView):
         )
 
 
+class _ActividadDocenteMixin:
+    """Actividad del docente autenticado y estudiantes activos de su paralelo."""
+
+    permission_classes = [IsDocente]
+
+    def _actividad_y_estudiantes(self, request, actividad_id):
+        actividad = get_object_or_404(
+            activities_selectors.actividades_visibles(request.user).select_related(
+                "asignacion__asignatura", "asignacion__paralelo__grado"
+            ),
+            pk=actividad_id,
+        )
+        estudiantes = Estudiante.objects.filter(
+            paralelo=actividad.asignacion.paralelo, is_active=True
+        ).order_by("last_name", "first_name")
+        return actividad, estudiantes
+
+
+class PlantillaCalificacionesView(_ActividadDocenteMixin, APIView):
+    """GET: descarga la plantilla Excel de la actividad (nómina + notas actuales)."""
+
+    def get(self, request, actividad_id):
+        actividad, estudiantes = self._actividad_y_estudiantes(request, actividad_id)
+        notas = dict(
+            Calificacion.objects.filter(actividad=actividad).values_list("estudiante_id", "valor")
+        )
+        contenido = excel.generar_plantilla(actividad, estudiantes, notas)
+        respuesta = HttpResponse(contenido, content_type=excel.CONTENT_TYPE)
+        respuesta["Content-Disposition"] = f'attachment; filename="{excel.nombre_archivo(actividad)}"'
+        return respuesta
+
+
+class ImportarCalificacionesView(_ActividadDocenteMixin, APIView):
+    """
+    POST (multipart, campo «archivo», opcional «columna_nota»): lee la plantilla de EduGest
+    o cualquier Excel/CSV (mapeo inteligente) y devuelve una vista previa de las notas.
+    NO guarda: el docente revisa y guarda con el flujo normal.
+    """
+
+    parser_classes = [MultiPartParser]
+
+    def post(self, request, actividad_id):
+        actividad, estudiantes = self._actividad_y_estudiantes(request, actividad_id)
+        services.verificar_calificable(actividad)
+        columna = request.data.get("columna_nota")
+        try:
+            columna = int(columna) if columna not in (None, "") else None
+        except (TypeError, ValueError):
+            raise ValidationError({"columna_nota": "Columna no válida."}) from None
+        return Response(
+            excel.leer_archivo(request.FILES.get("archivo"), actividad, estudiantes, columna)
+        )
+
+
+class TextoCalificacionesView(_ActividadDocenteMixin, APIView):
+    """
+    POST {"texto": "Vera 9, Gómez 4,5"}: interpreta notas escritas en texto libre y
+    devuelve una vista previa (mejora 13). NO guarda.
+    """
+
+    def post(self, request, actividad_id):
+        actividad, estudiantes = self._actividad_y_estudiantes(request, actividad_id)
+        services.verificar_calificable(actividad)
+        return Response(texto_libre.interpretar(request.data.get("texto", ""), estudiantes))
+
+
 class CalificacionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Consulta de notas según el rol.
@@ -185,7 +253,7 @@ class DesempenoEstudianteView(APIView):
 class DificultadViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Dificultades detectadas según el rol.
-    Filtros: ?estado=DETECTADA|SUPERADA ?nivel=MODERADA|ALTA ?estudiante= ?paralelo=
+    Filtros: ?estado=DETECTADA|SUPERADA ?nivel=MODERADA|ALTA ?reincidente=true|false ?estudiante= ?paralelo=
              ?asignatura= ?tema=
     """
 
@@ -209,6 +277,13 @@ class DificultadViewSet(viewsets.ReadOnlyModelViewSet):
             if nivel not in Dificultad.Nivel.values:
                 raise ValidationError({"nivel": "Valores válidos: MODERADA, ALTA."})
             qs = qs.filter(nivel=nivel)
+
+        reincidente = params.get("reincidente")
+        if reincidente:
+            reincidente = reincidente.lower()
+            if reincidente not in ("true", "false"):
+                raise ValidationError({"reincidente": "Valores válidos: true, false."})
+            qs = qs.filter(veces_detectada__gt=1) if reincidente == "true" else qs.filter(veces_detectada=1)
 
         qs = filter_by_id(qs, params, "estudiante", "estudiante_id")
         qs = filter_by_id(qs, params, "paralelo", "estudiante__paralelo_id")

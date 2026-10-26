@@ -5,7 +5,7 @@ from rest_framework.exceptions import ValidationError
 from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
 
 from . import selectors
-from .grados import grado_maximo
+from .grados import grado_maximo, grado_minimo
 from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Tema
 from .serializers import (
     AsignaturaSerializer,
@@ -54,7 +54,7 @@ class GradoViewSet(AcademicViewSet):
 
     def get_queryset(self):
         # Solo se ofrecen los grados habilitados (ver grados.py).
-        return Grado.objects.filter(orden__lte=grado_maximo())
+        return Grado.objects.filter(orden__gte=grado_minimo(), orden__lte=grado_maximo())
 
 
 class AsignaturaViewSet(AcademicViewSet):

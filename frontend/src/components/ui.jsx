@@ -78,7 +78,21 @@ export function Button({ variant = 'primary', loading = false, className, childr
     )
 }
 
-export function Field({ label, error, hint, className, ...input }) {
+/**
+ * `attention`: resalta el campo en amarillo (dato que falta o es poco seguro y el usuario
+ * debe revisar). Se quita solo cuando el campo deja de necesitar atención.
+ */
+const ATTENTION = 'border-warn-600 bg-warn-50 ring-2 ring-warn-600/20'
+
+function Hint({ id, attention, children }) {
+    return (
+        <p id={id} className={cx('mt-1.5 text-sm', attention ? 'font-semibold text-warn-600' : 'text-ink-500')}>
+            {children}
+        </p>
+    )
+}
+
+export function Field({ label, error, hint, attention = false, className, ...input }) {
     const id = useId()
     const describedBy = error ? `${id}-err` : hint ? `${id}-hint` : undefined
     return (
@@ -93,7 +107,7 @@ export function Field({ label, error, hint, className, ...input }) {
                 className={cx(
                     'block min-h-11 w-full rounded-xl border bg-white px-3.5 text-[15px] text-ink-900',
                     'placeholder:text-ink-300',
-                    error ? 'border-danger-600' : 'border-line hover:border-ink-300',
+                    error ? 'border-danger-600' : attention ? ATTENTION : 'border-line hover:border-ink-300',
                 )}
                 {...input}
             />
@@ -102,9 +116,9 @@ export function Field({ label, error, hint, className, ...input }) {
                     {error}
                 </p>
             ) : hint ? (
-                <p id={`${id}-hint`} className="mt-1.5 text-sm text-ink-500">
+                <Hint id={`${id}-hint`} attention={attention}>
                     {hint}
-                </p>
+                </Hint>
             ) : null}
         </div>
     )
@@ -224,7 +238,7 @@ export function Chip({ children, tone = 'brand' }) {
     return <span className={cx('inline-block rounded-full px-2.5 py-1 text-xs font-bold', tones[tone])}>{children}</span>
 }
 
-export function SelectField({ label, error, hint, className, children, ...select }) {
+export function SelectField({ label, error, hint, attention = false, className, children, ...select }) {
     const id = useId()
     return (
         <div className={className}>
@@ -236,7 +250,7 @@ export function SelectField({ label, error, hint, className, children, ...select
                 aria-invalid={error ? 'true' : undefined}
                 className={cx(
                     'block min-h-11 w-full rounded-xl border bg-white px-3 text-[15px] text-ink-900 disabled:bg-brand-50 disabled:text-ink-500',
-                    error ? 'border-danger-600' : 'border-line hover:border-ink-300',
+                    error ? 'border-danger-600' : attention ? ATTENTION : 'border-line hover:border-ink-300',
                 )}
                 {...select}
             >
@@ -245,7 +259,7 @@ export function SelectField({ label, error, hint, className, children, ...select
             {error ? (
                 <p className="mt-1.5 text-sm font-medium text-danger-600">{error}</p>
             ) : hint ? (
-                <p className="mt-1.5 text-sm text-ink-500">{hint}</p>
+                <Hint attention={attention}>{hint}</Hint>
             ) : null}
         </div>
     )
@@ -365,7 +379,7 @@ export function Tabs({ tabs, value, onChange, label }) {
     )
 }
 
-export function TextAreaField({ label, error, hint, className, ...textarea }) {
+export function TextAreaField({ label, error, hint, attention = false, className, ...textarea }) {
     const id = useId()
     return (
         <div className={className}>
@@ -377,14 +391,14 @@ export function TextAreaField({ label, error, hint, className, ...textarea }) {
                 aria-invalid={error ? 'true' : undefined}
                 className={cx(
                     'block min-h-28 w-full rounded-xl border bg-white px-3.5 py-2.5 text-[15px] text-ink-900',
-                    error ? 'border-danger-600' : 'border-line hover:border-ink-300',
+                    error ? 'border-danger-600' : attention ? ATTENTION : 'border-line hover:border-ink-300',
                 )}
                 {...textarea}
             />
             {error ? (
                 <p className="mt-1.5 text-sm font-medium text-danger-600">{error}</p>
             ) : hint ? (
-                <p className="mt-1.5 text-sm text-ink-500">{hint}</p>
+                <Hint attention={attention}>{hint}</Hint>
             ) : null}
         </div>
     )

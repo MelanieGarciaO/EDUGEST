@@ -13,14 +13,19 @@ from django.db.models import Exists, OuterRef, Prefetch, Q
 from apps.academic.models import AsignacionDocente
 from apps.security.models import Role
 
-from .models import ActividadRefuerzo, PlanRefuerzo, RecursoRefuerzo, TemaPlan
+from .models import ActividadRefuerzo, EvidenciaActividad, PlanRefuerzo, RecursoRefuerzo, TemaPlan
 
 PLAN_PREFETCH = Prefetch(
     "temas",
     queryset=TemaPlan.objects.select_related(
         "tema", "dificultad", "evaluacion__actividad"
     ).prefetch_related(
-        Prefetch("actividades", queryset=ActividadRefuerzo.objects.select_related("cumplida_por"))
+        Prefetch(
+            "actividades",
+            queryset=ActividadRefuerzo.objects.select_related("cumplida_por").prefetch_related(
+                "evidencias__subida_por"
+            ),
+        )
     ),
 )
 
@@ -49,22 +54,37 @@ def planes_base(user):
 def planes_visibles(user):
     return (
         planes_base(user)
-        .select_related("estudiante__paralelo__grado", "asignatura", "docente")
+        .select_related("estudiante__paralelo__grado", "asignatura", "docente", "revisado_por")
         .prefetch_related(PLAN_PREFETCH)
     )
 
 
 def actividades_refuerzo_visibles(user):
-    return ActividadRefuerzo.objects.filter(tema_plan__plan__in=planes_base(user)).select_related(
-        "tema_plan__plan__estudiante__paralelo", "tema_plan__plan__asignatura", "cumplida_por"
+    return (
+        ActividadRefuerzo.objects.filter(tema_plan__plan__in=planes_base(user))
+        .select_related(
+            "tema_plan__plan__estudiante__paralelo", "tema_plan__plan__asignatura", "cumplida_por"
+        )
+        .prefetch_related("evidencias__subida_por")
     )
+
+
+def evidencias_visibles(user):
+    return EvidenciaActividad.objects.filter(
+        actividad__tema_plan__plan__in=planes_base(user)
+    ).select_related("actividad__tema_plan__plan", "subida_por")
 
 
 def temas_plan_visibles(user):
     return (
         TemaPlan.objects.filter(plan__in=planes_base(user))
         .select_related("plan__estudiante__paralelo", "plan__asignatura", "tema", "dificultad")
-        .prefetch_related(Prefetch("actividades", queryset=ActividadRefuerzo.objects.select_related("cumplida_por")))
+        .prefetch_related(Prefetch(
+            "actividades",
+            queryset=ActividadRefuerzo.objects.select_related("cumplida_por").prefetch_related(
+                "evidencias__subida_por"
+            ),
+        ))
     )
 
 

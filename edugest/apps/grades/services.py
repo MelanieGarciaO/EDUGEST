@@ -14,6 +14,7 @@ from apps.security.models import Role
 
 from . import scale
 from .models import Calificacion, CalificacionHistorial, Dificultad
+from .resumen import resumen_claro
 from .signals import calificaciones_guardadas, dificultad_detectada, dificultad_superada
 
 
@@ -46,7 +47,8 @@ def verificar_calificable(actividad, hoy=None):
 def recalcular_dificultad(estudiante_id, tema_id):
     """
     Recalcula, con las notas del estudiante en ese tema, si hay dificultad:
-    - promedio < 7,00 -> dificultad DETECTADA (moderada o alta); si estaba superada, se reabre.
+    - promedio < 7,00 -> dificultad DETECTADA (moderada o alta); si estaba superada, se reabre
+      y queda como REINCIDENTE (veces_detectada + 1).
     - promedio >= 7,00 -> si estaba DETECTADA pasa a SUPERADA.
     Las notas de un subtema no cuentan para el tema padre: cada nodo se evalúa por separado.
     """
@@ -107,6 +109,8 @@ def recalcular_dificultad(estudiante_id, tema_id):
     existente.nivel = nivel
     existente.estado = Dificultad.Estado.DETECTADA
     existente.superada_en = None
+    if reabierta:
+        existente.veces_detectada += 1  # reincidencia: ya la había superado
     existente.save()
     if reabierta:
         _emitir(dificultad_detectada, existente)
@@ -269,7 +273,14 @@ def desempeno_estudiante(estudiante, user):
             "nombre": tema.nombre,
             **_datos_promedio(valores),
             "dificultad": (
-                {"nivel": dificultad.nivel, "estado": dificultad.estado} if dificultad else None
+                {
+                    "nivel": dificultad.nivel,
+                    "estado": dificultad.estado,
+                    "reincidente": dificultad.reincidente,
+                    "veces_detectada": dificultad.veces_detectada,
+                }
+                if dificultad
+                else None
             ),
             "subtemas": [
                 nodo(hijo) for hijo in sorted(hijos_de.get(tema.id, []), key=lambda t: t.nombre)
@@ -291,6 +302,7 @@ def desempeno_estudiante(estudiante, user):
             }
         )
 
+    promedio_general = scale.promedio(c.valor for c in califs)
     return {
         "estudiante": {
             "id": estudiante.id,
@@ -298,4 +310,6 @@ def desempeno_estudiante(estudiante, user):
             "paralelo": estudiante.paralelo.nombre_completo,
         },
         "asignaturas": resultado,
+        # Lectura en lenguaje claro para la familia (mejora 8).
+        "resumen": resumen_claro(estudiante.first_name, resultado, promedio_general),
     }

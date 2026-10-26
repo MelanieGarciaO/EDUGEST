@@ -94,6 +94,7 @@ class DificultadSerializer(serializers.ModelSerializer):
     asignatura_nombre = serializers.CharField(source="tema.asignatura.nombre", read_only=True)
     promedio_nivel = serializers.SerializerMethodField()
     refuerzo = serializers.SerializerMethodField()
+    reincidente = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Dificultad
@@ -114,6 +115,8 @@ class DificultadSerializer(serializers.ModelSerializer):
             "estado",
             "detectada_en",
             "superada_en",
+            "veces_detectada",
+            "reincidente",
             "updated_at",
             "refuerzo",
         )

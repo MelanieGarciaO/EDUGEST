@@ -261,7 +261,7 @@ export default function PlanDetalle() {
                     )}
                     {errSeg && <Alert>{errSeg.message}</Alert>}
                     <PlanHeader plan={plan} docente />
-                    <PlanTemas plan={plan} actions={accionesActividad} temaActions={accionesTema} />
+                    <PlanTemas plan={plan} actions={accionesActividad} temaActions={accionesTema} evidencias="ver" />
                 </div>
             )}
 

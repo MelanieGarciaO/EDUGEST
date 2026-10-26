@@ -5,16 +5,34 @@ from apps.grades.models import Dificultad
 from apps.security.models import Role
 
 from . import selectors
-from .models import ActividadRefuerzo, EstrategiaRefuerzo, PlanRefuerzo, RecursoRefuerzo, TemaPlan
+from .models import (
+    ActividadRefuerzo,
+    EstrategiaRefuerzo,
+    EvidenciaActividad,
+    PlanRefuerzo,
+    RecursoRefuerzo,
+    TemaPlan,
+)
 
 
 # ---------------------------------------------------------------------------
 # Lectura de planes
 # ---------------------------------------------------------------------------
+class EvidenciaSerializer(serializers.ModelSerializer):
+    subida_por_nombre = serializers.CharField(source="subida_por.full_name", read_only=True)
+    subida_por = serializers.IntegerField(source="subida_por_id", read_only=True)
+
+    class Meta:
+        model = EvidenciaActividad
+        fields = ("id", "actividad", "comentario", "tamano", "subida_por", "subida_por_nombre", "created_at")
+        read_only_fields = fields
+
+
 class ActividadRefuerzoSerializer(serializers.ModelSerializer):
     cumplida_por_nombre = serializers.CharField(
         source="cumplida_por.full_name", read_only=True, allow_null=True
     )
+    evidencias = EvidenciaSerializer(many=True, read_only=True)
 
     class Meta:
         model = ActividadRefuerzo
@@ -32,6 +50,7 @@ class ActividadRefuerzoSerializer(serializers.ModelSerializer):
             "cumplida_en",
             "cumplida_por",
             "cumplida_por_nombre",
+            "evidencias",
         )
         read_only_fields = fields
 
@@ -40,6 +59,9 @@ class TemaPlanSerializer(serializers.ModelSerializer):
     tema_nombre = serializers.CharField(source="tema.nombre", read_only=True)
     dificultad_estado = serializers.CharField(
         source="dificultad.estado", read_only=True, allow_null=True, default=None
+    )
+    dificultad_reincidente = serializers.BooleanField(
+        source="dificultad.reincidente", read_only=True, default=False
     )
     actividades = ActividadRefuerzoSerializer(many=True, read_only=True)
     nota_evaluacion = serializers.DecimalField(
@@ -65,6 +87,7 @@ class TemaPlanSerializer(serializers.ModelSerializer):
             "promedio_inicial",
             "nivel_dificultad",
             "dificultad_estado",
+            "dificultad_reincidente",
             "sin_recursos",
             "actividades",
             "nota_evaluacion",
@@ -87,6 +110,9 @@ class PlanSerializer(serializers.ModelSerializer):
     temas = TemaPlanSerializer(many=True, read_only=True)
     avance = serializers.SerializerMethodField()
     evaluacion = serializers.SerializerMethodField()
+    revisado_por_nombre = serializers.CharField(
+        source="revisado_por.full_name", read_only=True, allow_null=True, default=None
+    )
 
     class Meta:
         model = PlanRefuerzo
@@ -107,6 +133,8 @@ class PlanSerializer(serializers.ModelSerializer):
             "aprobado_en",
             "completado_en",
             "cancelado_en",
+            "revisado_en",
+            "revisado_por_nombre",
             "created_at",
         )
         read_only_fields = fields

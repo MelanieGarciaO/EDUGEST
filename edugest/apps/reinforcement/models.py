@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -102,6 +104,11 @@ class PlanRefuerzo(models.Model):
     aprobado_en = models.DateTimeField(null=True, blank=True)
     completado_en = models.DateTimeField(null=True, blank=True)
     cancelado_en = models.DateTimeField(null=True, blank=True)
+    # Acuse de recibo: el representante confirma que revisó el plan con el estudiante.
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    revisado_en = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -222,3 +229,40 @@ class ActividadRefuerzo(models.Model):
 
     def __str__(self):
         return self.titulo
+
+
+
+def _almacen_evidencias():
+    from django.core.files.storage import storages
+
+    return storages["evidencias"]
+
+
+def _ruta_evidencia(instancia, _nombre):
+    actividad = instancia.actividad
+    return f"plan-{actividad.tema_plan.plan_id}/actividad-{actividad.id}/{uuid.uuid4().hex}.jpg"
+
+
+class EvidenciaActividad(models.Model):
+    """
+    Foto opcional que el representante sube como evidencia de una actividad de refuerzo
+    hecha en casa. Se guarda re-codificada (JPEG, sin metadatos EXIF ni ubicación) en un
+    almacenamiento privado; solo la ven el representante y el docente del plan.
+    """
+
+    actividad = models.ForeignKey(
+        ActividadRefuerzo, on_delete=models.CASCADE, related_name="evidencias"
+    )
+    archivo = models.FileField(upload_to=_ruta_evidencia, storage=_almacen_evidencias, max_length=255)
+    comentario = models.CharField(max_length=300, blank=True)
+    tamano = models.PositiveIntegerField(help_text="Bytes del archivo guardado.")
+    subida_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "evidencia de actividad"
+        verbose_name_plural = "evidencias de actividades"
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"Evidencia {self.id} de {self.actividad}"

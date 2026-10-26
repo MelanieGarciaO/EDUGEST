@@ -13,7 +13,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import CommandError
 
-from .grados import grado_maximo
+from .grados import grado_maximo, grado_minimo, orden_habilitado
 from .models import Grado
 
 CARPETA_SEED = Path(settings.BASE_DIR) / "seed_data"
@@ -33,7 +33,7 @@ def agregar_opcion_grado(parser):
         type=int,
         default=None,
         help="Orden del grado donde cargar (1 a 10). Por defecto, el último habilitado en .env "
-        "(GRADO_MAXIMO_HABILITADO).",
+        "(GRADO_MAXIMO_HABILITADO). Debe estar entre GRADO_MINIMO_HABILITADO y GRADO_MAXIMO_HABILITADO.",
     )
 
 
@@ -82,10 +82,10 @@ def abortar_si_hay_errores(errores, origen):
 def grado_destino(orden):
     """Grado donde se cargan los ejemplos: el indicado o el último habilitado."""
     orden = orden or grado_maximo()
-    if not 1 <= orden <= grado_maximo():
+    if not orden_habilitado(orden):
         raise CommandError(
-            f"El grado {orden} no está habilitado (máximo: {grado_maximo()}). "
-            "Ajusta GRADO_MAXIMO_HABILITADO en .env o usa otro --grado."
+            f"El grado {orden} no está habilitado (rango: {grado_minimo()} a {grado_maximo()}). "
+            "Ajusta GRADO_MINIMO_HABILITADO / GRADO_MAXIMO_HABILITADO en .env o usa otro --grado."
         )
     grado = Grado.objects.filter(orden=orden).first()
     if grado is None:

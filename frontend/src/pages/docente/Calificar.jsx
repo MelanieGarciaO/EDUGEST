@@ -1,15 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, History, Save } from 'lucide-react'
+import { ArrowLeft, FileDown, FileUp, History, Save } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { Alert, Button, Card, Chip, PageHeader, SelectField, Spinner } from '../../components/ui'
 import { formatFecha, hoyISO } from '../../lib/dates'
-import { NOTA_LABEL, NOTA_TONE, formatNota } from '../../lib/format'
+import { LeyendaSemaforo, NivelChip } from '../../components/Semaforo'
+import { formatNota, nivelNota } from '../../lib/format'
 import { useActividad, useNotasActividad, useParalelos, useTemasActivos } from '../../lib/queries'
 
 /** Convierte «8,5» o «8.5» en un número válido entre 0 y 10; null si está vacío y NaN si no sirve. */
+/** Borde del campo de nota según el semáforo LOEI. */
+const BORDE_NIVEL = {
+    DOMINA: 'border-ok-600',
+    ALCANZA: 'border-brand-600',
+    PROXIMO: 'border-warn-600 bg-warn-50',
+    NO_ALCANZA: 'border-danger-600 bg-danger-50',
+}
+
 function leerNota(texto) {
     const t = texto.trim().replace(',', '.')
     if (t === '') return null
@@ -31,6 +40,83 @@ export default function Calificar() {
     const [result, setResult] = useState(null)
     const [err, setErr] = useState(null)
     const [historial, setHistorial] = useState(null) // id de la calificación abierta
+    const [importado, setImportado] = useState(null) // vista previa del Excel
+    const [excelError, setExcelError] = useState('')
+    const [descargando, setDescargando] = useState(false)
+    const archivoRef = useRef(null)
+    const [ultimoArchivo, setUltimoArchivo] = useState(null) // para cambiar la columna de nota
+    const [textoNotas, setTextoNotas] = useState('')
+
+    // Mejora 9: plantilla Excel fija.
+    async function descargarPlantilla() {
+        setExcelError('')
+        setDescargando(true)
+        try {
+            const res = await api.get(`/grades/actividades/${id}/calificaciones/plantilla/`, { responseType: 'blob' })
+            const nombre = /filename="([^"]+)"/.exec(res.headers['content-disposition'] ?? '')?.[1] ?? 'plantilla_notas.xlsx'
+            const url = URL.createObjectURL(res.data)
+            const enlace = document.createElement('a')
+            enlace.href = url
+            enlace.download = nombre
+            enlace.click()
+            URL.revokeObjectURL(url)
+        } catch {
+            setExcelError('No se pudo descargar la plantilla. Intenta de nuevo.')
+        } finally {
+            setDescargando(false)
+        }
+    }
+
+    // Vista previa (Excel, CSV o texto): solo llena el formulario; el docente revisa y guarda.
+    function aplicarVistaPrevia(data) {
+        setValores((v) => ({ ...v, ...Object.fromEntries(data.filas.map((f) => [f.estudiante, formatNota(f.valor)])) }))
+        setImportado(data)
+    }
+
+    const importar = useMutation({
+        mutationFn: async ({ archivo, columna }) => {
+            const datos = new FormData()
+            datos.append('archivo', archivo)
+            if (columna != null) datos.append('columna_nota', String(columna))
+            // Sin esta cabecera, axios convertiría el FormData a JSON (el cliente usa JSON por defecto).
+            return (
+                await api.post(`/grades/actividades/${id}/calificaciones/importar/`, datos, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                })
+            ).data
+        },
+        onMutate: () => {
+            setExcelError('')
+            setImportado(null)
+            setResult(null)
+        },
+        onSuccess: (data, { archivo }) => {
+            setUltimoArchivo(archivo)
+            aplicarVistaPrevia(data)
+        },
+        onError: (e) => {
+            const { message, fields } = parseApiError(e)
+            setExcelError(fields.archivo ?? fields.columna_nota ?? message)
+        },
+        onSettled: () => {
+            if (archivoRef.current) archivoRef.current.value = ''
+        },
+    })
+
+    // Mejora 13: notas desde texto libre («Vera 9, Gómez 4,5»).
+    const interpretar = useMutation({
+        mutationFn: async () => (await api.post(`/grades/actividades/${id}/calificaciones/texto/`, { texto: textoNotas })).data,
+        onMutate: () => {
+            setExcelError('')
+            setImportado(null)
+            setResult(null)
+        },
+        onSuccess: aplicarVistaPrevia,
+        onError: (e) => {
+            const { message, fields } = parseApiError(e)
+            setExcelError(fields.texto ?? message)
+        },
+    })
 
     // Evaluación de refuerzo: estudiantes con plan completado esperando esta nota.
     const esEvaluacion = !!actividad.data?.es_evaluacion_refuerzo
@@ -73,6 +159,7 @@ export default function Calificar() {
         onSuccess: (data) => {
             setResult(data)
             setErr(null)
+            setImportado(null)
             qc.invalidateQueries({ queryKey: ['notas-actividad', id] })
             qc.invalidateQueries({ queryKey: ['planes'] })
             qc.invalidateQueries({ queryKey: ['plan'] })
@@ -99,6 +186,10 @@ export default function Calificar() {
     const llenas = filas.filter((f) => leerNota(valores[f.estudiante] ?? '') !== null && !Number.isNaN(leerNota(valores[f.estudiante] ?? '')))
     const puedeGuardar = !bloqueada && !!tema && llenas.length > 0 && invalidas.length === 0
     const detectadas = result?.dificultades.filter((d) => d.estado === 'DETECTADA') ?? []
+    // Coincidencias aproximadas del Excel o del texto que el docente debe confirmar.
+    const verificar = Object.fromEntries(
+        (importado?.filas ?? []).filter((f) => f.confianza === 'media').map((f) => [f.estudiante, f.texto_original]),
+    )
 
     return (
         <>
@@ -159,6 +250,92 @@ export default function Calificar() {
                 )}
             </Card>
 
+            <Card className="mb-5 max-w-3xl">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-60">
+                        <p className="font-bold text-navy-800">Cargar notas desde Excel o CSV</p>
+                        <p className="text-sm text-ink-500">Usa la plantilla o sube tu propia planilla: se detectan las columnas de nombre y nota. Podrás revisar antes de guardar.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="secondary" onClick={descargarPlantilla} loading={descargando}>
+                            <FileDown className="size-4" aria-hidden="true" />
+                            Plantilla
+                        </Button>
+                        <Button variant="secondary" onClick={() => archivoRef.current?.click()} loading={importar.isPending} disabled={bloqueada}>
+                            <FileUp className="size-4" aria-hidden="true" />
+                            Subir archivo
+                        </Button>
+                        <input
+                            ref={archivoRef}
+                            type="file"
+                            accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                            className="sr-only"
+                            aria-label="Archivo Excel o CSV con las notas"
+                            onChange={(e) => e.target.files?.[0] && importar.mutate({ archivo: e.target.files[0] })}
+                        />
+                    </div>
+                </div>
+                <div className="mt-4 border-t border-line pt-4">
+                    <label htmlFor="texto-notas" className="font-bold text-navy-800">Pegar notas en texto</label>
+                    <p className="text-sm text-ink-500">Ejemplo: «Vera 9, Gómez 4,5, Morales 7» o una nota por línea.</p>
+                    <textarea
+                        id="texto-notas"
+                        rows={3}
+                        maxLength={5000}
+                        value={textoNotas}
+                        onChange={(e) => setTextoNotas(e.target.value)}
+                        disabled={bloqueada}
+                        className="mt-2 block w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[15px] hover:border-ink-300"
+                    />
+                    <div className="mt-2 flex justify-end">
+                        <Button variant="secondary" onClick={() => interpretar.mutate()} loading={interpretar.isPending} disabled={bloqueada || !textoNotas.trim()}>
+                            Interpretar notas
+                        </Button>
+                    </div>
+                </div>
+                {excelError ? <Alert className="mt-3">{excelError}</Alert> : null}
+                {importado ? (
+                    <Alert tone={importado.errores.length ? 'warn' : 'ok'} className="mt-3">
+                        <p>
+                            {`Se cargaron ${importado.filas.length} ${importado.filas.length === 1 ? 'nota' : 'notas'} ${importado.modo === 'texto' ? 'desde el texto' : 'desde el archivo'}`}
+                            {importado.sin_nota ? ` (${importado.sin_nota} sin nota)` : ''}
+                            {'. Revisa, elige el tema y pulsa «Guardar notas».'}
+                        </p>
+                        {importado.modo === 'mapeo' ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-2 font-normal">
+                                <span>{`Nombre: «${importado.mapeo.titulos_nombre.join(' + ')}» · Nota:`}</span>
+                                {importado.mapeo.columnas_nota.length > 1 ? (
+                                    <select
+                                        aria-label="Columna de la nota"
+                                        value={importado.mapeo.columna_nota}
+                                        disabled={importar.isPending || !ultimoArchivo}
+                                        onChange={(e) => importar.mutate({ archivo: ultimoArchivo, columna: Number(e.target.value) })}
+                                        className="min-h-9 rounded-lg border border-line bg-white px-2 text-sm"
+                                    >
+                                        {importado.mapeo.columnas_nota.map((c) => (
+                                            <option key={c.indice} value={c.indice}>{c.titulo}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <span>{`«${importado.mapeo.columnas_nota[0].titulo}»`}</span>
+                                )}
+                            </div>
+                        ) : null}
+                        {importado.filas.some((f) => f.confianza === 'media') ? (
+                            <p className="mt-1 font-normal">Revisa los nombres marcados con «Verifica»: se reconocieron con una coincidencia aproximada.</p>
+                        ) : null}
+                        {importado.errores.length > 0 ? (
+                            <ul className="mt-1 list-disc pl-5 font-normal">
+                                {importado.errores.map((e) => (
+                                    <li key={`${e.fila}-${e.mensaje}`}>{e.fila ? `Fila ${e.fila}: ${e.mensaje}` : e.mensaje}</li>
+                                ))}
+                            </ul>
+                        ) : null}
+                    </Alert>
+                ) : null}
+            </Card>
+
+            <LeyendaSemaforo className="mb-3 max-w-3xl" />
             <p className="mb-2 text-sm text-ink-500">
                 {resumen.calificados} de {resumen.estudiantes} calificados
                 {resumen.promedio != null && ` · Promedio del paralelo: ${formatNota(resumen.promedio)}`}
@@ -168,14 +345,17 @@ export default function Calificar() {
                 {filas.map((f) => {
                     const texto = valores[f.estudiante] ?? ''
                     const malo = Number.isNaN(leerNota(texto))
-                    const nivel = f.nivel && texto === formatNota(f.valor) ? f.nivel : null
+                    // Semáforo en tiempo real: el nivel cambia mientras el docente escribe la nota.
+                    const valor = malo ? null : leerNota(texto)
+                    const nivel = nivelNota(valor)
                     return (
                         <li key={f.estudiante} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
                             <div className="min-w-0 flex-1 basis-48">
                                 <p className="font-bold text-ink-900">{f.estudiante_nombre}</p>
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {nivel ? <Chip tone={NOTA_TONE[nivel]}>{NOTA_LABEL[nivel]}</Chip> : !f.valor && <span className="text-sm text-ink-500">Sin calificar</span>}
+                                    {nivel ? <NivelChip nivel={nivel} /> : <span className="text-sm text-ink-500">Sin calificar</span>}
                                     {porEvaluar[f.estudiante] && <Chip tone="warn">Plan completado · evaluar: {porEvaluar[f.estudiante].join(', ')}</Chip>}
+                                    {verificar[f.estudiante] ? <Chip tone="warn">{`Verifica: «${verificar[f.estudiante]}»`}</Chip> : null}
                                 </div>
                                 {f.calificacion && (
                                     <button
@@ -201,7 +381,7 @@ export default function Calificar() {
                                     value={texto}
                                     aria-invalid={malo ? 'true' : undefined}
                                     onChange={(e) => setValores((v) => ({ ...v, [f.estudiante]: e.target.value }))}
-                                    className={`block min-h-11 w-28 rounded-xl border bg-white px-3 text-right text-[15px] font-bold disabled:bg-brand-50 ${malo ? 'border-danger-600' : 'border-line hover:border-ink-300'}`}
+                                    className={`block min-h-11 w-28 rounded-xl border bg-white px-3 text-right text-[15px] font-bold disabled:bg-brand-50 ${malo ? 'border-danger-600' : BORDE_NIVEL[nivel] ?? 'border-line hover:border-ink-300'}`}
                                 />
                                 {malo && <p className="mt-1 text-xs font-medium text-danger-600">Entre 0 y 10</p>}
                             </div>

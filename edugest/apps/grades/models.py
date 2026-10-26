@@ -109,7 +109,15 @@ class Dificultad(models.Model):
     )
     detectada_en = models.DateTimeField(auto_now_add=True)
     superada_en = models.DateTimeField(null=True, blank=True)
+    # Cuántas veces se detectó la dificultad en este tema. Sube cuando una dificultad ya
+    # SUPERADA vuelve a DETECTADA (el estudiante recae en la misma destreza).
+    veces_detectada = models.PositiveIntegerField(default=1)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def reincidente(self):
+        """True si el estudiante ya había superado esta dificultad y volvió a presentarla."""
+        return self.veces_detectada > 1
 
     class Meta:
         verbose_name = "dificultad"

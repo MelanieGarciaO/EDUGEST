@@ -49,8 +49,9 @@ INSTITUCION_CIUDAD = env("INSTITUCION_CIUDAD", default="")
 INSTITUCION_CORREO_PRIVACIDAD = env("INSTITUCION_CORREO_PRIVACIDAD", default="")
 DATOS_PLAZO_CONSERVACION = env("DATOS_PLAZO_CONSERVACION", default="")
 
-# Grados de EGB habilitados: del 1.º hasta este número (1 a 10). Súbelo para abrir más grados.
-GRADO_MAXIMO_HABILITADO = env.int("GRADO_MAXIMO_HABILITADO", default=4)
+# Grados de EGB habilitados (1 a 10). Por defecto, EGB Media: de 5.º (Quinto) a 7.º (Séptimo).
+GRADO_MINIMO_HABILITADO = env.int("GRADO_MINIMO_HABILITADO", default=5)
+GRADO_MAXIMO_HABILITADO = env.int("GRADO_MAXIMO_HABILITADO", default=7)
 
 # ---------------------------------------------------------------------------
 # Aplicaciones
@@ -251,6 +252,41 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
     },
 }
+
+# ---------------------------------------------------------------------------
+# Evidencias de refuerzo (fotos que sube el representante)
+# ---------------------------------------------------------------------------
+# Con credenciales de Supabase Storage (API compatible con S3) se guardan en un bucket
+# PRIVADO; sin ellas, en una carpeta local que NO se publica (fuera de MEDIA_ROOT).
+# Las fotos nunca se sirven por URL pública: el backend las entrega solo a quien puede
+# ver el plan (ver reinforcement/views.py).
+SUPABASE_S3_KEY_ID = env("SUPABASE_S3_KEY_ID", default="")
+if SUPABASE_S3_KEY_ID:
+    STORAGES["evidencias"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": env("SUPABASE_S3_BUCKET", default="edugest"),
+            "endpoint_url": env("SUPABASE_S3_URL"),
+            "region_name": env("SUPABASE_S3_REGION"),
+            "access_key": SUPABASE_S3_KEY_ID,
+            "secret_key": env("SUPABASE_S3_SECRET"),
+            "location": "evidencias",
+            "addressing_style": "path",
+            "signature_version": "s3v4",
+            "default_acl": None,
+            "file_overwrite": False,
+            "querystring_auth": True,
+            "querystring_expire": 300,
+        },
+    }
+else:
+    STORAGES["evidencias"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": BASE_DIR / "privado" / "evidencias"},
+    }
+
+EVIDENCIA_MAX_MB = env.int("EVIDENCIA_MAX_MB", default=8)
+EVIDENCIAS_POR_ACTIVIDAD = env.int("EVIDENCIAS_POR_ACTIVIDAD", default=3)
 
 # ---------------------------------------------------------------------------
 # Correo (por ahora imprime en consola; se conectará a un servicio más adelante)

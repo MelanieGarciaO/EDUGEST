@@ -2,6 +2,7 @@ import { CheckCircle2, Circle, Clock } from 'lucide-react'
 
 import { ESTRATEGIA_LABEL, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
 import { Card, Chip, cx } from './ui'
+import Evidencias from './Evidencias'
 
 const fecha = (iso) => new Date(iso).toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -18,6 +19,7 @@ export function PlanHeader({ plan, docente = false }) {
                         <Chip tone={PLAN_ESTADO_TONE[plan.estado]}>{PLAN_ESTADO_LABEL[plan.estado]}</Chip>
                         <Chip tone={plan.nivel === 'ALTO' ? 'danger' : 'brand'}>{PLAN_NIVEL_LABEL[plan.nivel]}</Chip>
                         {ev && <Chip tone={ev.tone}>{ev.label}</Chip>}
+                        {plan.revisado_en ? <Chip tone="ok">Revisado por la familia</Chip> : null}
                     </div>
                     <p className="text-ink-500">
                         {plan.asignatura_nombre} · {plan.paralelo_nombre} · Docente: {plan.docente_nombre}
@@ -28,6 +30,11 @@ export function PlanHeader({ plan, docente = false }) {
                         {plan.completado_en && ` · Completado el ${fecha(plan.completado_en)}`}
                         {plan.cancelado_en && ` · Cancelado el ${fecha(plan.cancelado_en)}`}
                     </p>
+                    {plan.revisado_en ? (
+                        <p className="mt-0.5 text-sm text-ok-600">
+                            {`Revisado por ${plan.revisado_por_nombre ?? 'el representante'} el ${fecha(plan.revisado_en)}`}
+                        </p>
+                    ) : null}
                 </div>
                 <div className="min-w-44 flex-1 basis-44 sm:max-w-xs">
                     <p className="flex justify-between text-sm font-bold text-ink-700">
@@ -88,8 +95,11 @@ function TemaEvaluacion({ tema: t }) {
     )
 }
 
-/** Temas del plan con su objetivo y actividades. `actions(actividad, plan)` agrega botones por actividad y `temaActions(tema, plan)` botones del tema. */
-export function PlanTemas({ plan, actions, temaActions }) {
+/**
+ * Temas del plan con su objetivo y actividades. `actions(actividad, plan)` agrega botones por actividad,
+ * `temaActions(tema, plan)` botones del tema y `evidencias` ('ver' | 'subir') muestra las fotos de evidencia.
+ */
+export function PlanTemas({ plan, actions, temaActions, evidencias }) {
     return (
         <div className="space-y-5">
             {plan.temas.map((t) => {
@@ -106,6 +116,7 @@ export function PlanTemas({ plan, actions, temaActions }) {
                                         {t.nivel_dificultad === 'ALTA' ? 'Dificultad alta' : 'Dificultad moderada'}
                                     </Chip>
                                 )}
+                                {t.dificultad_reincidente ? <Chip tone="danger">Reincidente</Chip> : null}
                                 {(t.superado === true || (t.superado == null && t.dificultad_estado === 'SUPERADA')) && <Chip tone="ok">Tema superado</Chip>}
                             </div>
                             <p className="text-sm text-ink-500">
@@ -164,6 +175,7 @@ export function PlanTemas({ plan, actions, temaActions }) {
                                                         </p>
                                                     )}
                                                     {acciones && <div className="mt-2 flex flex-wrap gap-2">{acciones}</div>}
+                                                    {evidencias ? <Evidencias actividad={a} plan={plan} modo={evidencias} /> : null}
                                                 </div>
                                             </div>
                                         </li>

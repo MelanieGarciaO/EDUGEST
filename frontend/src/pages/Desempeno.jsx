@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, MessageSquareText } from 'lucide-react'
 
 import { Alert, Card, Chip, EmptyState, PageHeader, SelectField, Spinner, cx } from '../components/ui'
-import { NOTA_LABEL, NOTA_TONE, formatNota } from '../lib/format'
+import { LeyendaSemaforo, NivelChip } from '../components/Semaforo'
+import { formatNota, reincidenciaLabel } from '../lib/format'
 import { useDesempeno, useEstudiantes } from '../lib/queries'
 
 const BARRA = { DOMINA: 'bg-ok-600', ALCANZA: 'bg-brand-600', PROXIMO: 'bg-warn-600', NO_ALCANZA: 'bg-danger-600' }
@@ -10,7 +11,12 @@ const BARRA = { DOMINA: 'bg-ok-600', ALCANZA: 'bg-brand-600', PROXIMO: 'bg-warn-
 function Dificultad({ d }) {
     if (!d) return null
     if (d.estado === 'SUPERADA') return <Chip tone="ok">Dificultad superada</Chip>
-    return <Chip tone="danger">Dificultad {d.nivel === 'ALTA' ? 'alta' : 'moderada'}</Chip>
+    return (
+        <>
+            <Chip tone="danger">{`Dificultad ${d.nivel === 'ALTA' ? 'alta' : 'moderada'}`}</Chip>
+            {d.reincidente ? <Chip tone="danger">{reincidenciaLabel(d.veces_detectada)}</Chip> : null}
+        </>
+    )
 }
 
 function Barra({ promedio, nivel }) {
@@ -32,7 +38,7 @@ function Tema({ t, nivelAnidado = 0 }) {
                         <Dificultad d={t.dificultad} />
                     </div>
                     <p className="flex items-center gap-2">
-                        {t.promedio != null && <Chip tone={NOTA_TONE[t.nivel]}>{NOTA_LABEL[t.nivel]}</Chip>}
+                        {t.promedio != null ? <NivelChip nivel={t.nivel} corto /> : null}
                         <span className="min-w-12 text-right text-lg font-extrabold text-navy-800">{t.promedio != null ? formatNota(t.promedio) : '—'}</span>
                     </p>
                 </div>
@@ -52,6 +58,42 @@ function Tema({ t, nivelAnidado = 0 }) {
     )
 }
 
+/** Resumen en lenguaje claro (mejora 8): lo que dicen las notas, en palabras sencillas. */
+function ResumenClaro({ resumen }) {
+    if (!resumen) return null
+    return (
+        <Card as="section" className="border-l-4 border-l-brand-600">
+            <h2 className="flex items-center gap-2 text-lg font-extrabold text-navy-800">
+                <MessageSquareText className="size-5 text-brand-600" aria-hidden="true" />
+                Resumen en palabras sencillas
+            </h2>
+            <p className="mt-2 text-[15px] font-semibold text-ink-900">{resumen.general}</p>
+            {resumen.asignaturas.length > 1 ? (
+                <ul className="mt-2 list-disc space-y-0.5 pl-5 text-ink-700">
+                    {resumen.asignaturas.map((t) => (
+                        <li key={t}>{t}</li>
+                    ))}
+                </ul>
+            ) : null}
+            {resumen.fortalezas ? <p className="mt-3 text-ok-600"><span className="font-bold">👍 </span>{resumen.fortalezas}</p> : null}
+            {resumen.superados ? <p className="mt-2 text-ok-600"><span className="font-bold">✅ </span>{resumen.superados}</p> : null}
+            {resumen.a_reforzar.length > 0 ? (
+                <div className="mt-3">
+                    <p className="font-bold text-warn-600">Necesita reforzar:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-ink-700">
+                        {resumen.a_reforzar.map((t) => (
+                            <li key={t}>{t}</li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+            {resumen.recomendacion ? (
+                <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-navy-800">{resumen.recomendacion}</p>
+            ) : null}
+        </Card>
+    )
+}
+
 /** Desempeño académico de un estudiante. Lo usan el docente (sus asignaturas) y el representante. */
 export default function Desempeno() {
     const estudiantes = useEstudiantes()
@@ -63,6 +105,7 @@ export default function Desempeno() {
     return (
         <>
             <PageHeader title="Desempeño" subtitle="Promedio y nivel de aprendizaje por asignatura y tema." />
+            <LeyendaSemaforo className="mb-5 max-w-3xl" />
 
             {estudiantes.isLoading && <Spinner />}
             {estudiantes.isError && <Alert>No se pudieron cargar los estudiantes. Intenta de nuevo.</Alert>}
@@ -88,6 +131,7 @@ export default function Desempeno() {
                 </EmptyState>
             )}
             <div className="max-w-3xl space-y-5">
+                <ResumenClaro resumen={desempeno.data?.resumen} />
                 {desempeno.data?.asignaturas.map((a) => (
                     <Card key={a.asignatura} as="article">
                         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -98,7 +142,7 @@ export default function Desempeno() {
                             <div className="text-right">
                                 <p className="text-3xl font-extrabold leading-none text-navy-800">{formatNota(a.promedio)}</p>
                                 <div className="mt-1.5">
-                                    <Chip tone={NOTA_TONE[a.nivel]}>{NOTA_LABEL[a.nivel]}</Chip>
+                                    <NivelChip nivel={a.nivel} />
                                 </div>
                             </div>
                         </div>
