@@ -10,48 +10,20 @@ Protección de datos (LOPDP; los estudiantes son menores de edad):
 - Se recomienda en pantalla fotografiar el trabajo, no el rostro del estudiante.
 """
 
-from io import BytesIO
-
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
-from PIL import Image, ImageOps, UnidentifiedImageError
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from apps.activities import archivos
 from apps.security.models import Role
 
 from .models import ActividadRefuerzo, EvidenciaActividad, PlanRefuerzo
 
-FORMATOS = {"JPEG", "PNG", "WEBP"}
-LADO_MAXIMO = 1600
-CALIDAD = 82
-Image.MAX_IMAGE_PIXELS = 40_000_000  # evita «bombas» de descompresión
-
 
 def _limpiar_imagen(archivo):
-    """Valida la imagen y devuelve bytes JPEG sin metadatos."""
-    maximo = settings.EVIDENCIA_MAX_MB * 1024 * 1024
-    if archivo.size > maximo:
-        raise ValidationError({"archivo": f"La foto supera los {settings.EVIDENCIA_MAX_MB} MB."})
-    try:
-        with Image.open(archivo) as prueba:
-            formato = prueba.format
-            prueba.verify()
-        archivo.seek(0)
-        with Image.open(archivo) as img:
-            img.load()
-            if formato not in FORMATOS:
-                raise ValidationError({"archivo": "Formato no admitido. Usa JPG, PNG o WEBP."})
-            img = ImageOps.exif_transpose(img)  # respeta la orientación antes de quitar EXIF
-            img = img.convert("RGB")
-            img.thumbnail((LADO_MAXIMO, LADO_MAXIMO))
-            salida = BytesIO()
-            img.save(salida, format="JPEG", quality=CALIDAD, optimize=True)  # sin exif=
-            return salida.getvalue()
-    except ValidationError:
-        raise
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, SyntaxError):
-        raise ValidationError({"archivo": "El archivo no es una imagen válida."}) from None
+    """Valida la imagen y devuelve bytes JPEG sin metadatos (ver activities/archivos.py)."""
+    return archivos.limpiar_imagen(archivo, settings.EVIDENCIA_MAX_MB)
 
 
 @transaction.atomic
