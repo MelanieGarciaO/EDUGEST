@@ -8,6 +8,7 @@ import { MaterialesInput } from '../../components/Materiales'
 import { Alert, Button, Card, CheckboxField, Field, PageHeader, SelectField, TextAreaField } from '../../components/ui'
 import { hoyISO } from '../../lib/dates'
 import { useAsignaciones } from '../../lib/queries'
+import { ModalidadEntrega, SelectorPdf } from '../../components/ArchivosActividad'
 
 const MIN = 3
 const MAX = 2000
@@ -39,6 +40,7 @@ export default function NuevaActividad() {
     const [prev, setPrev] = useState(null) // respuesta de previsualizar
     const [form, setForm] = useState(null)
     const [err, setErr] = useState({ message: '', fields: {} })
+    const [pdfs, setPdfs] = useState([]) // PDF del docente: se suben tras publicar
 
     // Paralelos donde el docente tiene asignaciones activas (sin repetir).
     const paralelos = [...new Map((asignaciones.data ?? []).map((a) => [a.paralelo, a.paralelo_nombre])).entries()]
@@ -58,14 +60,15 @@ export default function NuevaActividad() {
                 materiales: p.materiales ?? [],
                 tema: p.tema ?? '',
                 es_evaluacion_refuerzo: false,
+                modalidad_entrega: 'PRESENCIAL',
             })
             setErr({ message: '', fields: {} })
         },
     })
 
     const publish = useMutation({
-        mutationFn: () =>
-            api.post('/activities/actividades/', {
+        mutationFn: async () => {
+            const { data: actividad } = await api.post('/activities/actividades/', {
                 paralelo: prev.paralelo,
                 asignatura: Number(form.asignatura),
                 descripcion: form.descripcion.trim(),
@@ -74,10 +77,25 @@ export default function NuevaActividad() {
                 materiales: form.materiales,
                 tema: form.tema.trim(),
                 es_evaluacion_refuerzo: form.es_evaluacion_refuerzo,
+                modalidad_entrega: form.modalidad_entrega,
                 extraccion: prev.extraccion,
-            }),
-        onSuccess: () => {
+            })
+            // La actividad ya quedó publicada; los PDF se adjuntan uno a uno.
+            const fallidos = []
+            for (const archivo of pdfs) {
+                const datos = new FormData()
+                datos.append('archivo', archivo)
+                try {
+                    await api.post(`/activities/actividades/${actividad.id}/adjuntos/`, datos, { headers: { 'Content-Type': 'multipart/form-data' } })
+                } catch (e) {
+                    fallidos.push(`${archivo.name}: ${parseApiError(e).fields.archivo ?? parseApiError(e).message}`)
+                }
+            }
+            return fallidos
+        },
+        onSuccess: (fallidos) => {
             qc.invalidateQueries({ queryKey: ['actividades'] })
+            if (fallidos.length) window.alert(`La actividad se publicó, pero no se pudieron adjuntar:\n${fallidos.join('\n')}\n\nPuedes agregarlos desde la tarjeta de la actividad.`)
             navigate('/docente/actividades')
         },
         onError: (e) => setErr(parseApiError(e)),
@@ -212,6 +230,9 @@ export default function NuevaActividad() {
                 />
                 <Field label="Tema" maxLength={150} value={form.tema} onChange={set('tema')} error={f.tema} hint={form.tema ? aviso(p.confianza?.tema) : 'Opcional.'} />
                 <MaterialesInput value={form.materiales} onChange={(v) => setForm((x) => ({ ...x, materiales: v }))} error={f.materiales} />
+                <ModalidadEntrega value={form.modalidad_entrega} onChange={(v) => setForm((x) => ({ ...x, modalidad_entrega: v }))} />
+                {f.modalidad_entrega ? <p className="text-sm font-medium text-danger-600">{f.modalidad_entrega}</p> : null}
+                <SelectorPdf archivos={pdfs} onChange={setPdfs} />
                 <CheckboxField
                     label="Es una evaluación de refuerzo"
                     hint="Su nota cerrará los planes de refuerzo completados de los estudiantes en el tema que califiques."
