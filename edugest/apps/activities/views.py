@@ -1,19 +1,21 @@
 from django.db import transaction
 from django.db.models import Prefetch
+from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.academic import selectors as academic_selectors
 from apps.academic.models import AsignacionDocente, Tema
 from apps.grades.models import Calificacion
 from apps.security.models import Role
-from apps.security.permissions import IsDocente, IsPasswordUpToDate
+from apps.security.permissions import IsDocente, IsPasswordUpToDate, IsRepresentante
 
-from . import nlp, clock, selectors
-from .models import Actividad, Extraccion
+from . import clock, entregas, nlp, selectors
+from .models import Actividad, AdjuntoActividad, ArchivoEntrega, Extraccion
 from .serializers import (
     ActividadCrearSerializer,
     ActividadEditarSerializer,
@@ -44,14 +46,22 @@ class ActividadViewSet(viewsets.ModelViewSet):
         POST   /               -> publica la actividad (tras revisar la propuesta)
         PATCH  /{id}/          -> edita descripción, fecha, materiales o tema
         POST   /{id}/cancelar/ -> cancela la actividad
-    No hay borrado.
+        POST   /{id}/adjuntos/ -> adjunta un PDF (multipart «archivo»)
+    - Entregas desde la app:
+        GET    /{id}/entregas/ -> estado por estudiante (docente: todos; representante: los suyos)
+        POST   /{id}/entregas/ -> el representante sube una foto o PDF
+                                  (multipart «archivo», «estudiante», «comentario» opcional)
+    No hay borrado de actividades.
     """
 
     http_method_names = ["get", "post", "patch", "head", "options"]
+    parser_classes = [JSONParser, MultiPartParser]
 
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
             return [IsPasswordUpToDate()]
+        if self.action == "entregas":
+            return [IsRepresentante()] if self.request.method == "POST" else [IsPasswordUpToDate()]
         return [IsDocente()]
 
     def get_serializer_class(self):
@@ -162,6 +172,30 @@ class ActividadViewSet(viewsets.ModelViewSet):
         )
 
     # --- Cancelación ------------------------------------------------------------
+    # --- Archivos ---------------------------------------------------------------
+    @action(detail=True, methods=["post"])
+    def adjuntos(self, request, pk=None):
+        entregas.subir_adjunto(self.get_object(), request.user, request.FILES.get("archivo"))
+        actividad = self.get_queryset().get(pk=pk)
+        return Response(
+            ActividadSerializer(actividad, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["get", "post"])
+    def entregas(self, request, pk=None):
+        actividad = self.get_object()
+        if request.method == "POST":
+            entregas.subir_entrega(
+                actividad,
+                request.user,
+                request.data.get("estudiante"),
+                request.FILES.get("archivo"),
+                request.data.get("comentario", ""),
+            )
+            return Response(entregas.entregas_de(actividad, request.user), status=status.HTTP_201_CREATED)
+        return Response(entregas.entregas_de(actividad, request.user))
+
     @action(detail=True, methods=["post"], url_path="cancelar")
     def cancelar(self, request, pk=None):
         actividad = self.get_object()
@@ -177,3 +211,67 @@ class ActividadViewSet(viewsets.ModelViewSet):
             lambda: actividad_cancelada.send(sender=Actividad, actividad=actividad)
         )
         return Response(ActividadSerializer(actividad, context={"request": request}).data)
+
+
+def _respuesta_archivo(registro, content_type):
+    respuesta = FileResponse(
+        registro.archivo.open("rb"), content_type=content_type, filename=registro.nombre
+    )
+    respuesta["Content-Disposition"] = respuesta["Content-Disposition"].replace("attachment", "inline")
+    respuesta["Cache-Control"] = "private, max-age=300"
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    return respuesta
+
+
+class AdjuntoViewSet(viewsets.GenericViewSet):
+    """
+    PDF adjuntos por el docente.
+      GET    /{id}/archivo/  quien puede ver la actividad (docente, representantes, admin)
+      DELETE /{id}/          el docente de la actividad
+    """
+
+    def get_permissions(self):
+        return [IsDocente()] if self.action == "destroy" else [IsPasswordUpToDate()]
+
+    def get_queryset(self):
+        return AdjuntoActividad.objects.filter(
+            actividad__in=selectors.actividades_visibles(self.request.user)
+        ).select_related("actividad__asignacion")
+
+    def destroy(self, request, pk=None):
+        entregas.eliminar_adjunto(self.get_object(), request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def archivo(self, request, pk=None):
+        return _respuesta_archivo(self.get_object(), "application/pdf")
+
+
+class ArchivoEntregaViewSet(viewsets.GenericViewSet):
+    """
+    Archivos de las entregas desde la app.
+      GET    /{id}/archivo/  docente de la actividad, administrador o representante del estudiante
+      DELETE /{id}/          quien lo subió, mientras no haya nota
+    """
+
+    def get_permissions(self):
+        return [IsRepresentante()] if self.action == "destroy" else [IsPasswordUpToDate()]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = ArchivoEntrega.objects.filter(
+            actividad__in=selectors.actividades_visibles(user)
+        ).select_related("actividad__asignacion")
+        if user.role == Role.REPRESENTANTE:
+            qs = qs.filter(estudiante__representante=user)
+        return qs
+
+    def destroy(self, request, pk=None):
+        entregas.eliminar_archivo_entrega(self.get_object(), request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def archivo(self, request, pk=None):
+        registro = self.get_object()
+        tipo = "application/pdf" if registro.tipo == ArchivoEntrega.Tipo.PDF else "image/jpeg"
+        return _respuesta_archivo(registro, tipo)

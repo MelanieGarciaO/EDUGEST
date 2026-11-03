@@ -1,13 +1,18 @@
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, Smartphone } from 'lucide-react'
 
 import { diasRestantes, formatFecha, horaCorta, textoPlazo } from '../lib/dates'
 import { formatNota } from '../lib/format'
+import { AdjuntosActividad, EntregaRepresentante } from './ArchivosActividad'
 import { MaterialesChips } from './Materiales'
 import { NivelChip } from './Semaforo'
 import { Chip, cx } from './ui'
 
-/** Tarjeta de una actividad. `children` recibe las acciones (editar, cancelar…). */
-export default function ActividadCard({ actividad: a, showDocente = false, children }) {
+/**
+ * Tarjeta de una actividad. `children` recibe las acciones (editar, cancelar…).
+ * `adjuntosEditables`: el docente puede agregar o quitar PDF. Para el representante
+ * (llega `notas`) se muestra la entrega desde la app cuando la modalidad es APP.
+ */
+export default function ActividadCard({ actividad: a, showDocente = false, adjuntosEditables = false, children }) {
     const cancelada = a.vigencia === 'cancelada'
     const pendiente = a.vigencia === 'pendiente'
     const dias = diasRestantes(a.fecha_entrega)
@@ -24,6 +29,12 @@ export default function ActividadCard({ actividad: a, showDocente = false, child
                         <h3 className="text-lg font-extrabold text-navy-800">{a.asignatura_nombre}</h3>
                         {a.tema && <Chip>{a.tema}</Chip>}
                         {a.es_evaluacion_refuerzo && <Chip tone="ok">Evaluación de refuerzo</Chip>}
+                        {a.modalidad_entrega === 'APP' ? (
+                            <Chip>
+                                <Smartphone className="mr-1 inline size-3.5 align-[-2px]" aria-hidden="true" />
+                                Entrega en la app
+                            </Chip>
+                        ) : null}
                         {cancelada && <Chip tone="danger">Cancelada</Chip>}
                         {a.vigencia === 'finalizada' && !calificada && <Chip tone="warn">Finalizada</Chip>}
                         {calificada && <Chip tone="ok">Calificada</Chip>}
@@ -60,6 +71,10 @@ export default function ActividadCard({ actividad: a, showDocente = false, child
                     <MaterialesChips items={a.materiales} />
                 </div>
             )}
+
+            <AdjuntosActividad actividad={a} editable={adjuntosEditables && !cancelada} />
+
+            {notas ? <EntregaRepresentante actividad={a} /> : null}
 
             {notas && !cancelada && (calificada || a.vigencia === 'finalizada') && <NotasActividad notas={notas} />}
 

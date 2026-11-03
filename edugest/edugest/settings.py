@@ -288,6 +288,12 @@ else:
 EVIDENCIA_MAX_MB = env.int("EVIDENCIA_MAX_MB", default=8)
 EVIDENCIAS_POR_ACTIVIDAD = env.int("EVIDENCIAS_POR_ACTIVIDAD", default=3)
 
+# Archivos de actividades: PDF del docente y entregas del representante (imágenes o PDF).
+ADJUNTO_MAX_MB = env.int("ADJUNTO_MAX_MB", default=10)
+ADJUNTOS_POR_ACTIVIDAD = env.int("ADJUNTOS_POR_ACTIVIDAD", default=5)
+ENTREGA_MAX_MB = env.int("ENTREGA_MAX_MB", default=10)
+ARCHIVOS_POR_ENTREGA = env.int("ARCHIVOS_POR_ENTREGA", default=5)
+
 # ---------------------------------------------------------------------------
 # Correo (por ahora imprime en consola; se conectará a un servicio más adelante)
 # ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import uuid
 from datetime import time
 
 from django.conf import settings
@@ -72,6 +73,10 @@ class Actividad(models.Model):
     lo que el docente realmente imparte.
     """
 
+    class ModalidadEntrega(models.TextChoices):
+        PRESENCIAL = "PRESENCIAL", "Presencial (en clase)"
+        APP = "APP", "Desde la app (el representante sube la entrega)"
+
     class Estado(models.TextChoices):
         PUBLICADA = "PUBLICADA", "Publicada"
         CANCELADA = "CANCELADA", "Cancelada"
@@ -91,6 +96,12 @@ class Actividad(models.Model):
     )
     materiales = models.JSONField("materiales", default=list, blank=True)
     tema = models.CharField("tema", max_length=150, blank=True)
+    modalidad_entrega = models.CharField(
+        "modalidad de entrega",
+        max_length=12,
+        choices=ModalidadEntrega.choices,
+        default=ModalidadEntrega.PRESENCIAL,
+    )
     es_evaluacion_refuerzo = models.BooleanField(
         "evaluación de refuerzo",
         default=False,
@@ -142,3 +153,76 @@ class Actividad(models.Model):
         if self.estado == self.Estado.CANCELADA:
             return "cancelada"
         return "finalizada" if self.vencida(hoy, hora) else "pendiente"
+
+
+
+# ---------------------------------------------------------------------------
+# Archivos de la actividad (almacenamiento privado «evidencias»)
+# ---------------------------------------------------------------------------
+def _almacen():
+    from django.core.files.storage import storages
+
+    return storages["evidencias"]
+
+
+def _ruta_adjunto(instancia, _nombre):
+    return f"actividades/{instancia.actividad_id}/adjuntos/{uuid.uuid4().hex}.pdf"
+
+
+def _ruta_entrega(instancia, nombre):
+    ext = "pdf" if instancia.tipo == ArchivoEntrega.Tipo.PDF else "jpg"
+    return (
+        f"actividades/{instancia.actividad_id}/entregas/estudiante-{instancia.estudiante_id}/"
+        f"{uuid.uuid4().hex}.{ext}"
+    )
+
+
+class AdjuntoActividad(models.Model):
+    """PDF que el docente adjunta a la actividad (instrucciones, rúbrica, taller…)."""
+
+    actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name="adjuntos")
+    archivo = models.FileField(upload_to=_ruta_adjunto, storage=_almacen, max_length=255)
+    nombre = models.CharField("nombre del archivo", max_length=100)
+    tamano = models.PositiveIntegerField()
+    subido_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "adjunto de actividad"
+        verbose_name_plural = "adjuntos de actividades"
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class ArchivoEntrega(models.Model):
+    """
+    Archivo (foto o PDF) que el representante sube como entrega de una actividad con
+    modalidad «desde la app». La entrega de un estudiante = sus archivos en la actividad.
+    """
+
+    class Tipo(models.TextChoices):
+        IMAGEN = "IMAGEN", "Imagen"
+        PDF = "PDF", "PDF"
+
+    actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name="archivos_entrega")
+    estudiante = models.ForeignKey(
+        "academic.Estudiante", on_delete=models.CASCADE, related_name="archivos_entrega"
+    )
+    tipo = models.CharField(max_length=6, choices=Tipo.choices)
+    archivo = models.FileField(upload_to=_ruta_entrega, storage=_almacen, max_length=255)
+    nombre = models.CharField("nombre del archivo", max_length=100)
+    tamano = models.PositiveIntegerField()
+    comentario = models.CharField(max_length=300, blank=True)
+    subido_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "archivo de entrega"
+        verbose_name_plural = "archivos de entregas"
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["actividad", "estudiante"])]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.estudiante_id})"

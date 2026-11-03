@@ -103,6 +103,7 @@ class ActividadSerializer(serializers.ModelSerializer):
     docente_nombre = serializers.CharField(source="asignacion.docente.full_name", read_only=True)
     vigencia = serializers.SerializerMethodField()
     notas = serializers.SerializerMethodField()
+    adjuntos = serializers.SerializerMethodField()
 
     class Meta:
         model = Actividad
@@ -120,6 +121,8 @@ class ActividadSerializer(serializers.ModelSerializer):
             "materiales",
             "tema",
             "es_evaluacion_refuerzo",
+            "modalidad_entrega",
+            "adjuntos",
             "estado",
             "vigencia",
             "created_at",
@@ -131,6 +134,13 @@ class ActividadSerializer(serializers.ModelSerializer):
 
     def get_vigencia(self, obj):
         return obj.vigencia()
+
+    def get_adjuntos(self, obj):
+        """PDF del docente (instrucciones, rúbrica, taller). Se descargan por la API."""
+        return [
+            {"id": a.id, "nombre": a.nombre, "tamano": a.tamano, "created_at": a.created_at}
+            for a in obj.adjuntos.all()
+        ]
 
     def get_notas(self, obj):
         """
@@ -178,6 +188,11 @@ class ActividadCrearSerializer(serializers.Serializer):
     materiales = materiales_field()
     tema = serializers.CharField(max_length=150, required=False, allow_blank=True)
     es_evaluacion_refuerzo = serializers.BooleanField(required=False, default=False)
+    modalidad_entrega = serializers.ChoiceField(
+        choices=Actividad.ModalidadEntrega.choices,
+        required=False,
+        default=Actividad.ModalidadEntrega.PRESENCIAL,
+    )
     extraccion = ExtraccionDelDocenteField(required=False, allow_null=True)
 
     def validate_materiales(self, value):
@@ -221,6 +236,9 @@ class ActividadCrearSerializer(serializers.Serializer):
                     materiales=validated_data.get("materiales", []),
                     tema=validated_data.get("tema", ""),
                     es_evaluacion_refuerzo=validated_data.get("es_evaluacion_refuerzo", False),
+                    modalidad_entrega=validated_data.get(
+                        "modalidad_entrega", Actividad.ModalidadEntrega.PRESENCIAL
+                    ),
                     texto_original=extraccion.texto_original if extraccion else "",
                     extraccion=extraccion,
                 )
@@ -259,6 +277,7 @@ class ActividadEditarSerializer(serializers.ModelSerializer):
             "materiales",
             "tema",
             "es_evaluacion_refuerzo",
+            "modalidad_entrega",
         )
 
     def validate_materiales(self, value):
@@ -269,6 +288,14 @@ class ActividadEditarSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         actividad = self.instance
+        if (
+            attrs.get("modalidad_entrega") == Actividad.ModalidadEntrega.PRESENCIAL
+            and actividad.modalidad_entrega == Actividad.ModalidadEntrega.APP
+            and actividad.archivos_entrega.exists()
+        ):
+            raise serializers.ValidationError(
+                {"modalidad_entrega": "Ya hay entregas subidas en la app; no se puede cambiar a presencial."}
+            )
         if actividad.estado == Actividad.Estado.CANCELADA:
             raise serializers.ValidationError("No se puede editar una actividad cancelada.")
         if actividad.vencida():

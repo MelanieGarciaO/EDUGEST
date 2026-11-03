@@ -64,7 +64,7 @@ export default function DocenteActividades() {
             )}
             <div className="space-y-4">
                 {data?.results.map((a) => (
-                    <ActividadCard key={a.id} actividad={a}>
+                    <ActividadCard key={a.id} actividad={a} adjuntosEditables>
                         {a.vigencia === 'pendiente' && (
                             <>
                                 <Button variant="secondary" className="min-h-10" onClick={() => setEditing(a)} aria-label={`Editar actividad de ${a.asignatura_nombre}`}>

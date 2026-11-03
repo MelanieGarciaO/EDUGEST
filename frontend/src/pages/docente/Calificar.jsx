@@ -9,6 +9,8 @@ import { formatFecha, hoyISO } from '../../lib/dates'
 import { LeyendaSemaforo, NivelChip } from '../../components/Semaforo'
 import { formatNota, nivelNota } from '../../lib/format'
 import { useActividad, useNotasActividad, useParalelos, useTemasActivos } from '../../lib/queries'
+import { AdjuntosActividad, EntregaEstudiante } from '../../components/ArchivosActividad'
+import { useEntregasPorEstudiante } from '../../lib/archivos'
 
 /** Convierte «8,5» o «8.5» en un número válido entre 0 y 10; null si está vacío y NaN si no sirve. */
 /** Borde del campo de nota según el semáforo LOEI. */
@@ -31,6 +33,7 @@ export default function Calificar() {
     const { id } = useParams()
     const qc = useQueryClient()
     const actividad = useActividad(id)
+    const entregas = useEntregasPorEstudiante(actividad.data)
     const notas = useNotasActividad(id)
     const paralelos = useParalelos()
     const temas = useTemasActivos()
@@ -202,7 +205,10 @@ export default function Calificar() {
                 subtitle={`${a.paralelo_nombre} · Entrega: ${formatFecha(a.fecha_entrega)}`}
             />
 
-            <p className="mb-5 max-w-3xl whitespace-pre-line rounded-xl bg-white px-4 py-3 text-ink-700">{a.descripcion}</p>
+            <div className="mb-5 max-w-3xl rounded-xl bg-white px-4 py-3">
+                <p className="whitespace-pre-line text-ink-700">{a.descripcion}</p>
+                <AdjuntosActividad actividad={a} />
+            </div>
 
             {esEvaluacion && (
                 <Alert tone="ok" className="mb-5 max-w-3xl">
@@ -339,6 +345,7 @@ export default function Calificar() {
             <p className="mb-2 text-sm text-ink-500">
                 {resumen.calificados} de {resumen.estudiantes} calificados
                 {resumen.promedio != null && ` · Promedio del paralelo: ${formatNota(resumen.promedio)}`}
+                {a.modalidad_entrega === 'APP' && !entregas.cargando ? ` · Entregas en la app: ${entregas.entregadas} de ${entregas.total}` : ''}
             </p>
 
             <ul className="max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
@@ -357,6 +364,7 @@ export default function Calificar() {
                                     {porEvaluar[f.estudiante] && <Chip tone="warn">Plan completado · evaluar: {porEvaluar[f.estudiante].join(', ')}</Chip>}
                                     {verificar[f.estudiante] ? <Chip tone="warn">{`Verifica: «${verificar[f.estudiante]}»`}</Chip> : null}
                                 </div>
+                                <EntregaEstudiante fila={entregas.mapa[f.estudiante]} />
                                 {f.calificacion && (
                                     <button
                                         type="button"

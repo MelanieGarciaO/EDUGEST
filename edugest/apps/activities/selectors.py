@@ -24,7 +24,7 @@ _RELACIONES = (
 
 
 def actividades_visibles(user):
-    qs = Actividad.objects.select_related(*_RELACIONES)
+    qs = Actividad.objects.select_related(*_RELACIONES).prefetch_related("adjuntos")
     if user.role == Role.ADMINISTRADOR:
         return qs
     if user.role == Role.DOCENTE:
