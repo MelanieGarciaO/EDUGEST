@@ -8,6 +8,7 @@ from . import scale
 from .models import Calificacion, CalificacionHistorial, Dificultad
 
 MAX_CALIFICACIONES_POR_ENVIO = 100
+MAX_OBSERVACION = 500
 
 
 class NivelMixin(serializers.Serializer):
@@ -54,6 +55,7 @@ class CalificacionSerializer(NivelMixin, serializers.ModelSerializer):
             "tema",
             "tema_nombre",
             "valor",
+            "observacion",
             "nivel",
             "nivel_nombre",
             "created_at",
@@ -145,6 +147,11 @@ class ItemCalificacionSerializer(serializers.Serializer):
         min_value=Decimal("0"),
         max_value=Decimal("10"),
         error_messages={"max_decimal_places": "Usa como máximo 2 decimales."},
+    )
+    # Opcional. Si no se envía, la observación guardada no cambia; "" la borra.
+    observacion = serializers.CharField(
+        required=False, allow_blank=True, max_length=MAX_OBSERVACION, trim_whitespace=True,
+        error_messages={"max_length": f"La observación admite hasta {MAX_OBSERVACION} caracteres."},
     )
 
 

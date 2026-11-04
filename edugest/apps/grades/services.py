@@ -129,12 +129,15 @@ def guardar_calificaciones(actividad, tema, items, usuario):
     """
     Crea o actualiza las notas de varios estudiantes en una actividad.
 
-    items: lista de (estudiante_id, valor: Decimal). Los estudiantes no incluidos no
-    cambian. Cada corrección de una nota existente deja un registro de historial.
+    items: lista de (estudiante_id, valor: Decimal) o (estudiante_id, valor, observacion).
+    Los estudiantes no incluidos no cambian. Cada corrección de una nota existente deja un
+    registro de historial. La observación es opcional: None la deja como está y "" la borra;
+    cambiar solo la observación no altera el historial ni recalcula dificultades.
     Devuelve un diccionario con los conteos, las notas tocadas y las dificultades vigentes
     de los estudiantes/temas afectados.
     """
-    ids = [estudiante_id for estudiante_id, _ in items]
+    items = [(item[0], item[1], item[2] if len(item) > 2 else None) for item in items]
+    ids = [estudiante_id for estudiante_id, _, _ in items]
     existentes = {
         c.estudiante_id: c
         for c in Calificacion.objects.select_for_update().filter(
@@ -146,7 +149,7 @@ def guardar_calificaciones(actividad, tema, items, usuario):
     afectados = set()  # (estudiante_id, tema_id) a recalcular
     tocadas = []
 
-    for estudiante_id, valor in items:
+    for estudiante_id, valor, observacion in items:
         calificacion = existentes.get(estudiante_id)
 
         if calificacion is None:
@@ -155,12 +158,18 @@ def guardar_calificaciones(actividad, tema, items, usuario):
                 estudiante_id=estudiante_id,
                 tema=tema,
                 valor=valor,
+                observacion=observacion or "",
                 registrada_por=usuario,
             )
             creadas += 1
             afectados.add((estudiante_id, tema.id))
         elif calificacion.valor == valor and calificacion.tema_id == tema.id:
-            sin_cambios += 1
+            if observacion is not None and observacion != calificacion.observacion:
+                calificacion.observacion = observacion
+                calificacion.save(update_fields=["observacion", "updated_at"])
+                actualizadas += 1
+            else:
+                sin_cambios += 1
         else:
             CalificacionHistorial.objects.create(
                 calificacion=calificacion,
@@ -174,6 +183,8 @@ def guardar_calificaciones(actividad, tema, items, usuario):
             afectados.add((estudiante_id, tema.id))
             calificacion.valor = valor
             calificacion.tema = tema
+            if observacion is not None:
+                calificacion.observacion = observacion
             calificacion.save()
             actualizadas += 1
         tocadas.append(calificacion.pk)

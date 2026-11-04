@@ -157,6 +157,7 @@ class ActividadSerializer(serializers.ModelSerializer):
                 "estudiante_nombre": c.estudiante.full_name,
                 "tema_nombre": c.tema.nombre,
                 "valor": str(c.valor),
+                "observacion": c.observacion,
                 "nivel": scale.nivel_cualitativo(c.valor),
                 "nivel_nombre": scale.nombre_nivel(scale.nivel_cualitativo(c.valor)),
                 "fecha": c.updated_at,

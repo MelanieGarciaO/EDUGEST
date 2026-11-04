@@ -31,6 +31,8 @@ class Calificacion(models.Model):
     registrada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="calificaciones_registradas"
     )
+    # Retroalimentación opcional del docente para el estudiante y su representante.
+    observacion = models.TextField("observación", max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -168,13 +168,14 @@ def calificaciones(user, f):
 
     detalle = Seccion(
         "Detalle de notas",
-        [("Entrega", 1.2), ("Estudiante", 2.5), ("Asignatura", 2), ("Tema", 2.5), ("Actividad", 4), ("Nota", 0.9)],
+        [("Entrega", 1.2), ("Estudiante", 2.3), ("Asignatura", 1.8), ("Tema", 2.2), ("Actividad", 3.2),
+         ("Nota", 0.9), ("Observación", 3.2)],
     )
     notas.sort(key=lambda c: (c.actividad.fecha_entrega, _orden_estudiante(c.estudiante)))
     for c in notas:
         detalle.filas.append([
             c.actividad.fecha_entrega, c.estudiante.full_name, c.actividad.asignacion.asignatura.nombre,
-            str(c.tema), c.actividad.descripcion[:120], c.valor,
+            str(c.tema), c.actividad.descripcion[:120], c.valor, c.observacion,
         ])
     return [_limitar(resumen), _limitar(detalle)]
 

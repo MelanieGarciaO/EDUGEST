@@ -36,7 +36,8 @@ class ActividadCalificacionesView(APIView):
     POST (solo el docente dueño): guarda en una sola operación las notas de varios
          estudiantes y las asocia a un tema. Si el estudiante ya tenía nota, la corrige y
          deja historial.
-         Cuerpo: {"tema": 3, "calificaciones": [{"estudiante": 10, "valor": "8.50"}, ...]}
+         Cuerpo: {"tema": 3, "calificaciones": [{"estudiante": 10, "valor": "8.50",
+                  "observacion": "Muy buen trabajo"}, ...]}  (observacion es opcional)
     """
 
     def get_permissions(self):
@@ -70,6 +71,7 @@ class ActividadCalificacionesView(APIView):
                     "estudiante_nombre": estudiante.full_name,
                     "calificacion": c.id if c else None,
                     "valor": str(c.valor) if c else None,
+                    "observacion": c.observacion if c else "",
                     "tema": c.tema_id if c else None,
                     "tema_nombre": c.tema.nombre if c else None,
                     "nivel": nivel,
@@ -112,7 +114,7 @@ class ActividadCalificacionesView(APIView):
         resultado = services.guardar_calificaciones(
             actividad,
             datos["tema"],
-            [(i["estudiante"], i["valor"]) for i in datos["calificaciones"]],
+            [(i["estudiante"], i["valor"], i.get("observacion")) for i in datos["calificaciones"]],
             request.user,
         )
         guardadas = calificaciones_visibles(request.user).filter(
