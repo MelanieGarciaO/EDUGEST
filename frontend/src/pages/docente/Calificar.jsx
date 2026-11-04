@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileDown, FileUp, History, Save } from 'lucide-react'
+import { ArrowLeft, FileDown, FileUp, History, MessageSquareText, Save } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { Alert, Button, Card, Chip, PageHeader, SelectField, Spinner } from '../../components/ui'
@@ -39,6 +39,8 @@ export default function Calificar() {
     const temas = useTemasActivos()
 
     const [valores, setValores] = useState({}) // estudianteId -> texto
+    const [observaciones, setObservaciones] = useState({}) // estudianteId -> retroalimentación
+    const [abiertas, setAbiertas] = useState({}) // estudianteId -> observación visible
     const [tema, setTema] = useState('')
     const [result, setResult] = useState(null)
     const [err, setErr] = useState(null)
@@ -143,6 +145,7 @@ export default function Calificar() {
     useEffect(() => {
         if (!notas.data) return
         setValores(Object.fromEntries(notas.data.calificaciones.map((f) => [f.estudiante, f.valor != null ? formatNota(f.valor) : ''])))
+        setObservaciones(Object.fromEntries(notas.data.calificaciones.map((f) => [f.estudiante, f.observacion ?? ''])))
         setTema((t) => t || String(notas.data.calificaciones.find((f) => f.tema)?.tema ?? ''))
     }, [notas.data])
 
@@ -155,7 +158,11 @@ export default function Calificar() {
     const save = useMutation({
         mutationFn: async () => {
             const calificaciones = Object.entries(valores)
-                .map(([estudiante, texto]) => ({ estudiante: Number(estudiante), valor: leerNota(texto) }))
+                .map(([estudiante, texto]) => ({
+                    estudiante: Number(estudiante),
+                    valor: leerNota(texto),
+                    observacion: (observaciones[estudiante] ?? '').trim(),
+                }))
                 .filter((c) => c.valor !== null)
             return (await api.post(`/grades/actividades/${id}/calificaciones/`, { tema: Number(tema), calificaciones })).data
         },
@@ -346,6 +353,7 @@ export default function Calificar() {
                 {resumen.calificados} de {resumen.estudiantes} calificados
                 {resumen.promedio != null && ` · Promedio del paralelo: ${formatNota(resumen.promedio)}`}
                 {a.modalidad_entrega === 'APP' && !entregas.cargando ? ` · Entregas en la app: ${entregas.entregadas} de ${entregas.total}` : ''}
+                {' · Las observaciones son opcionales y las verá el representante.'}
             </p>
 
             <ul className="max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
@@ -365,18 +373,48 @@ export default function Calificar() {
                                     {verificar[f.estudiante] ? <Chip tone="warn">{`Verifica: «${verificar[f.estudiante]}»`}</Chip> : null}
                                 </div>
                                 <EntregaEstudiante fila={entregas.mapa[f.estudiante]} />
-                                {f.calificacion && (
-                                    <button
-                                        type="button"
-                                        className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline"
-                                        aria-expanded={historial === f.calificacion}
-                                        onClick={() => setHistorial((h) => (h === f.calificacion ? null : f.calificacion))}
-                                    >
-                                        <History className="size-3.5" aria-hidden="true" />
-                                        {historial === f.calificacion ? 'Ocultar cambios' : 'Ver cambios de la nota'}
-                                    </button>
-                                )}
-                                {historial === f.calificacion && <HistorialNota calificacion={f.calificacion} />}
+                                {(() => {
+                                    const obsAbierta = !!abiertas[f.estudiante] || !!f.observacion
+                                    return (
+                                        <>
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1">
+                                                {f.calificacion && (
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline"
+                                                        aria-expanded={historial === f.calificacion}
+                                                        onClick={() => setHistorial((h) => (h === f.calificacion ? null : f.calificacion))}
+                                                    >
+                                                        <History className="size-3.5" aria-hidden="true" />
+                                                        {historial === f.calificacion ? 'Ocultar cambios' : 'Ver cambios de la nota'}
+                                                    </button>
+                                                )}
+                                                {!obsAbierta && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={bloqueada}
+                                                        onClick={() => setAbiertas((o) => ({ ...o, [f.estudiante]: true }))}
+                                                        className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline disabled:text-ink-300 disabled:no-underline"
+                                                    >
+                                                        <MessageSquareText className="size-3.5" aria-hidden="true" />
+                                                        Agregar observación
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {historial === f.calificacion && <HistorialNota calificacion={f.calificacion} />}
+                                            {obsAbierta && (
+                                                <ObservacionNota
+                                                    estudiante={f.estudiante}
+                                                    nombre={f.estudiante_nombre}
+                                                    texto={observaciones[f.estudiante] ?? ''}
+                                                    sinNota={valor === null}
+                                                    disabled={bloqueada}
+                                                    onChange={(t) => setObservaciones((o) => ({ ...o, [f.estudiante]: t }))}
+                                                />
+                                            )}
+                                        </>
+                                    )
+                                })()}
                             </div>
                             <div>
                                 <label htmlFor={`nota-${f.estudiante}`} className="sr-only">Nota de {f.estudiante_nombre}</label>
@@ -405,6 +443,37 @@ export default function Calificar() {
                 </Button>
             </div>
         </>
+    )
+}
+
+const MAX_OBSERVACION = 500
+
+/** Retroalimentación opcional del docente para el estudiante (la ve su representante). */
+function ObservacionNota({ estudiante, nombre, texto, sinNota, disabled, onChange }) {
+    const id = `obs-${estudiante}`
+    return (
+        <div className="mt-2">
+            <label htmlFor={id} className="mb-1 flex items-center gap-1 text-xs font-bold text-ink-700">
+                <MessageSquareText className="size-3.5" aria-hidden="true" />
+                Observación para {nombre} <span className="font-normal text-ink-500">(opcional)</span>
+            </label>
+            <textarea
+                id={id}
+                rows={2}
+                maxLength={MAX_OBSERVACION}
+                disabled={disabled}
+                value={texto}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder="Ej.: Buen procedimiento; repasa la simplificación de fracciones."
+                className="block w-full resize-y rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink-900 hover:border-ink-300 disabled:bg-brand-50"
+            />
+            <div className="mt-0.5 flex justify-between gap-2 text-xs text-ink-500">
+                <span className={sinNota && texto.trim() ? 'font-medium text-warn-600' : ''}>
+                    {sinNota && texto.trim() ? 'Escribe la nota para que se guarde la observación.' : 'La verá el representante junto a la nota.'}
+                </span>
+                <span>{`${texto.length}/${MAX_OBSERVACION}`}</span>
+            </div>
+        </div>
     )
 }
 

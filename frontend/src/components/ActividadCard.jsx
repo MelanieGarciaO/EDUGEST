@@ -1,4 +1,4 @@
-import { CalendarDays, Smartphone } from 'lucide-react'
+import { CalendarDays, MessageSquareText, Smartphone } from 'lucide-react'
 
 import { diasRestantes, formatFecha, horaCorta, textoPlazo } from '../lib/dates'
 import { formatNota } from '../lib/format'
@@ -108,6 +108,15 @@ function NotasActividad({ notas }) {
                             <span className="text-sm font-bold text-ink-500"> / 10</span>
                         </span>
                     </div>
+                    {n.observacion ? (
+                        <div className="basis-full rounded-lg border-l-4 border-brand-600 bg-white px-3 py-2">
+                            <p className="flex items-center gap-1 text-xs font-bold text-ink-700">
+                                <MessageSquareText className="size-3.5" aria-hidden="true" />
+                                Observación del docente
+                            </p>
+                            <p className="mt-0.5 whitespace-pre-line text-sm text-ink-900">{n.observacion}</p>
+                        </div>
+                    ) : null}
                 </div>
             ))}
         </div>
