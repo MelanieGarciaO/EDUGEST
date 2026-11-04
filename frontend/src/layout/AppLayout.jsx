@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { BarChart3, ClipboardList, GraduationCap, Home, LifeBuoy, Library, ListTree, LogOut, Menu, School, TriangleAlert, UserRound, Users, X } from 'lucide-react'
+import { BarChart3, ClipboardList, FileDown, GraduationCap, Home, LifeBuoy, Library, ListTree, LogOut, Menu, School, TriangleAlert, UserRound, Users, X } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { Avatar, Logo, cx } from '../components/ui'
@@ -13,6 +13,7 @@ const ADMIN_NAV = [
     { to: '/admin/asignaciones', label: 'Asignaciones', icon: ClipboardList },
     { to: '/admin/temas', label: 'Temas', icon: ListTree },
     { to: '/admin/recursos', label: 'Banco de recursos', icon: Library },
+    { to: '/admin/reportes', label: 'Reportes', icon: FileDown },
 ]
 
 const DOCENTE_NAV = [
@@ -21,6 +22,7 @@ const DOCENTE_NAV = [
     { to: '/docente/desempeno', label: 'Desempeño', icon: BarChart3 },
     { to: '/docente/dificultades', label: 'Dificultades', icon: TriangleAlert },
     { to: '/docente/planes', label: 'Planes de refuerzo', icon: LifeBuoy },
+    { to: '/docente/reportes', label: 'Reportes', icon: FileDown },
 ]
 
 const REPRESENTANTE_NAV = [
@@ -28,6 +30,7 @@ const REPRESENTANTE_NAV = [
     { to: '/representante/desempeno', label: 'Desempeño', icon: BarChart3 },
     { to: '/representante/dificultades', label: 'Dificultades', icon: TriangleAlert },
     { to: '/representante/planes', label: 'Planes de refuerzo', icon: LifeBuoy },
+    { to: '/representante/reportes', label: 'Reportes', icon: FileDown },
 ]
 
 function navFor(user) {

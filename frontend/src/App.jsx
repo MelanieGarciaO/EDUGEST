@@ -17,6 +17,7 @@ import Asignaciones from './pages/admin/Asignaciones'
 import Estudiantes from './pages/admin/Estudiantes'
 import Temas from './pages/admin/Temas'
 import Recursos from './pages/Recursos'
+import Reportes from './pages/Reportes'
 import DocenteActividades from './pages/docente/Actividades'
 import NuevaActividad from './pages/docente/NuevaActividad'
 import RepresentanteActividades from './pages/representante/Actividades'
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/admin/asignaciones" element={<Asignaciones />} />
             <Route path="/admin/temas" element={<Temas />} />
             <Route path="/admin/recursos" element={<Recursos />} />
+            <Route path="/admin/reportes" element={<Reportes />} />
           </Route>
           <Route element={<RequireRole roles={[ROLES.DOCENTE]} />}>
             <Route path="/docente" element={<DocenteHome />} />
@@ -59,6 +61,7 @@ export default function App() {
             <Route path="/docente/dificultades" element={<Dificultades />} />
             <Route path="/docente/planes" element={<DocentePlanes />} />
             <Route path="/docente/planes/:id" element={<PlanDetalle />} />
+            <Route path="/docente/reportes" element={<Reportes />} />
           </Route>
           <Route element={<RequireRole roles={[ROLES.REPRESENTANTE]} />}>
             <Route path="/representante" element={<RepresentanteHome />} />
@@ -67,6 +70,7 @@ export default function App() {
             <Route path="/representante/dificultades" element={<Dificultades />} />
             <Route path="/representante/planes" element={<RepresentantePlanes />} />
             <Route path="/representante/planes/:id" element={<RepresentantePlanDetalle />} />
+            <Route path="/representante/reportes" element={<Reportes />} />
           </Route>
           <Route path="/perfil" element={<Profile />} />
         </Route>
