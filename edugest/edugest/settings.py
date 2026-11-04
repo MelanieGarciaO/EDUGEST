@@ -294,6 +294,14 @@ ADJUNTOS_POR_ACTIVIDAD = env.int("ADJUNTOS_POR_ACTIVIDAD", default=5)
 ENTREGA_MAX_MB = env.int("ENTREGA_MAX_MB", default=10)
 ARCHIVOS_POR_ENTREGA = env.int("ARCHIVOS_POR_ENTREGA", default=5)
 
+# Lectura de la indicación docente desde PDF o imagen (apps/activities/lectura_archivos.py).
+# El OCR usa Tesseract instalado en el sistema; en Windows indica la ruta en TESSERACT_CMD.
+PLN_ARCHIVO_MAX_MB = env.int("PLN_ARCHIVO_MAX_MB", default=10)
+PLN_ARCHIVO_MAX_PAGINAS = env.int("PLN_ARCHIVO_MAX_PAGINAS", default=5)
+PLN_OCR_IDIOMA = env("PLN_OCR_IDIOMA", default="spa")
+PLN_OCR_TIMEOUT = env.int("PLN_OCR_TIMEOUT", default=30)
+TESSERACT_CMD = env("TESSERACT_CMD", default="")
+
 # ---------------------------------------------------------------------------
 # Correo (por ahora imprime en consola; se conectará a un servicio más adelante)
 # ---------------------------------------------------------------------------

@@ -14,12 +14,13 @@ from apps.grades.models import Calificacion
 from apps.security.models import Role
 from apps.security.permissions import IsDocente, IsPasswordUpToDate, IsRepresentante
 
-from . import clock, entregas, nlp, selectors
+from . import clock, entregas, lectura_archivos, nlp, selectors
 from .models import Actividad, AdjuntoActividad, ArchivoEntrega, Extraccion
 from .serializers import (
     ActividadCrearSerializer,
     ActividadEditarSerializer,
     ActividadSerializer,
+    MAX_TEXTO,
     PrevisualizarSerializer,
 )
 from .signals import actividad_cancelada
@@ -42,6 +43,8 @@ class ActividadViewSet(viewsets.ModelViewSet):
         Filtros: ?paralelo= ?asignatura= ?estudiante= ?vigencia=pendiente|finalizada|cancelada
                  ?search=texto
     - Escritura (solo docentes sobre sus propias asignaciones):
+        POST   extraer-texto/  -> lee un PDF o imagen (multipart «archivo») y devuelve su
+                                  texto para revisarlo antes de previsualizar
         POST   previsualizar/  -> procesa la indicación con PLN y devuelve una propuesta
         POST   /               -> publica la actividad (tras revisar la propuesta)
         PATCH  /{id}/          -> edita descripción, fecha, materiales o tema
@@ -171,7 +174,16 @@ class ActividadViewSet(viewsets.ModelViewSet):
             }
         )
 
-    # --- Cancelación ------------------------------------------------------------
+    # --- Lectura de la indicación desde un archivo ------------------------------
+    @action(detail=False, methods=["post"], url_path="extraer-texto")
+    def extraer_texto(self, request):
+        """
+        PDF digital -> texto directo; PDF escaneado o imagen -> OCR (Tesseract).
+        No guarda el archivo: solo devuelve el texto para que el docente lo revise.
+        """
+        resultado = lectura_archivos.extraer_texto(request.FILES.get("archivo"), MAX_TEXTO)
+        return Response(resultado)
+
     # --- Archivos ---------------------------------------------------------------
     @action(detail=True, methods=["post"])
     def adjuntos(self, request, pk=None):
