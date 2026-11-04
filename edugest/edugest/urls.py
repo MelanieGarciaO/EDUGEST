@@ -27,4 +27,5 @@ urlpatterns = [
     path("api/grades/", include("apps.grades.urls")),
     path("api/reinforcement/", include("apps.reinforcement.urls")),
     path("api/notifications/", include("apps.notifications.urls")),
+    path("api/reports/", include("apps.reports.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

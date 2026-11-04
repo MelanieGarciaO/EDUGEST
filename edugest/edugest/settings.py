@@ -79,6 +79,7 @@ LOCAL_APPS = [
     "apps.grades",  # Calificaciones y desempeño.
     "apps.reinforcement",  # Dificultades y planes de refuerzo.
     "apps.notifications",
+    "apps.reports",  # Reportes descargables (PDF / Excel) por rol.
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -211,6 +212,8 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:3000", "http://localhost:5173"],
 )
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+# Permite al frontend leer el nombre de los archivos descargados (reportes, plantillas).
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 
 # ---------------------------------------------------------------------------
 # Seguridad HTTP
