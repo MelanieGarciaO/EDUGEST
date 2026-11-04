@@ -9,6 +9,7 @@ import { Alert, Button, Card, CheckboxField, Field, PageHeader, SelectField, Tex
 import { hoyISO } from '../../lib/dates'
 import { useAsignaciones } from '../../lib/queries'
 import { ModalidadEntrega, SelectorPdf } from '../../components/ArchivosActividad'
+import LeerDesdeArchivo from '../../components/LeerDesdeArchivo'
 
 const MIN = 3
 const MAX = 2000
@@ -118,7 +119,7 @@ export default function NuevaActividad() {
         return (
             <>
                 {back}
-                <PageHeader title="Nueva actividad" subtitle="Escribe la tarea con tus palabras. Antes de publicar podrás revisar lo que entendimos." />
+                <PageHeader title="Nueva actividad" subtitle="Escribe la tarea con tus palabras o léela desde un PDF o una foto. Antes de publicar podrás revisar lo que entendimos." />
                 <Card className="max-w-3xl space-y-5">
                     {previewError && <Alert>{previewError.fields.texto ?? previewError.fields.paralelo ?? previewError.message}</Alert>}
                     <SelectField label="Paralelo" value={paraleloId} onChange={(e) => setParalelo(e.target.value)}>
@@ -130,6 +131,7 @@ export default function NuevaActividad() {
                     {asignaciones.isSuccess && paralelos.length === 0 && (
                         <Alert tone="warn">No tienes paralelos asignados. Pide al administrador que te asigne uno.</Alert>
                     )}
+                    <LeerDesdeArchivo textoActual={texto} onTexto={(t) => setTexto(t.slice(0, MAX))} />
                     <TextAreaField
                         label="Describe la actividad"
                         value={texto}
