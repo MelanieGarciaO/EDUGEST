@@ -1,5 +1,7 @@
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.http import HttpResponse
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 
 from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
@@ -7,6 +9,7 @@ from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
 from . import selectors
 from .grados import grado_maximo, grado_minimo
 from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Tema
+from . import exportaciones
 from .serializers import (
     AsignaturaSerializer,
     AsignacionDocenteSerializer,
@@ -46,7 +49,14 @@ class AcademicViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
             return [IsPasswordUpToDate()]
-        return [IsAdministrador()]
+        return [IsAdministrador()]  # incluye «exportar»
+
+    def _descargar_excel(self, reporte):
+        contenido = exportaciones.a_xlsx(reporte)
+        respuesta = HttpResponse(contenido, content_type=exportaciones.CONTENT_TYPE_XLSX)
+        respuesta["Content-Disposition"] = f'attachment; filename="{exportaciones.nombre_archivo(reporte)}"'
+        respuesta["Cache-Control"] = "no-store"
+        return respuesta
 
 
 class GradoViewSet(AcademicViewSet):
@@ -94,6 +104,12 @@ class EstudianteViewSet(AcademicViewSet):
             qs = qs.filter(Q(first_name__icontains=search) | Q(last_name__icontains=search))
         return qs.order_by("last_name", "first_name")
 
+    @action(detail=False, methods=["get"])
+    def exportar(self, request):
+        """GET /estudiantes/exportar/ — Excel con el listado, aplicando los mismos filtros."""
+        qs = self.get_queryset().select_related("paralelo__grado", "representante")
+        return self._descargar_excel(exportaciones.estudiantes(qs, request))
+
 
 class AsignacionDocenteViewSet(AcademicViewSet):
     serializer_class = AsignacionDocenteSerializer
@@ -106,6 +122,16 @@ class AsignacionDocenteViewSet(AcademicViewSet):
         qs = filter_by_id(qs, params, "asignatura", "asignatura_id")
         qs = filter_by_active(qs, params)
         return qs.order_by("paralelo__grado__orden", "paralelo__nombre", "asignatura__nombre")
+
+    @action(detail=False, methods=["get"])
+    def exportar(self, request):
+        """GET /asignaciones/exportar/ — Excel con el listado, aplicando los mismos filtros."""
+        qs = self.get_queryset().select_related("paralelo__grado", "asignatura", "docente").annotate(
+            n_estudiantes=Count(
+                "paralelo__estudiantes", filter=Q(paralelo__estudiantes__is_active=True), distinct=True
+            )
+        )
+        return self._descargar_excel(exportaciones.asignaciones(qs, request))
 
 
 class TemaViewSet(AcademicViewSet):
