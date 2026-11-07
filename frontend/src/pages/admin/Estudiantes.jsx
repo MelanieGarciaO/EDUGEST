@@ -4,6 +4,7 @@ import { GraduationCap, Pencil, Plus, Power, Search } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { CrudForm, ToggleActiveDialog } from '../../components/CrudForm'
+import ExportarExcel from '../../components/ExportarExcel'
 import { IconButton, ListBox, Row } from '../../components/ListParts'
 import {
     Alert,
@@ -79,10 +80,13 @@ export default function Estudiantes() {
     return (
         <>
             <PageHeader title="Estudiantes" subtitle="Cada estudiante pertenece a un paralelo y está vinculado a un representante.">
-                <Button onClick={() => setForm({})} disabled={Boolean(missing) || paralelos.isPending || representantes.isPending}>
-                    <Plus className="size-5" aria-hidden="true" />
-                    Nuevo estudiante
-                </Button>
+                <div className="flex flex-wrap items-start gap-2">
+                    <ExportarExcel url="/academic/estudiantes/exportar/" params={{ ...params, page: undefined }} archivo="estudiantes.xlsx" />
+                    <Button onClick={() => setForm({})} disabled={Boolean(missing) || paralelos.isPending || representantes.isPending}>
+                        <Plus className="size-5" aria-hidden="true" />
+                        Nuevo estudiante
+                    </Button>
+                </div>
             </PageHeader>
             {missing && !paralelos.isPending && !representantes.isPending && (
                 <Alert tone="warn" className="mb-4">

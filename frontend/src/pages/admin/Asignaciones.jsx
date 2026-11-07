@@ -4,6 +4,7 @@ import { ClipboardList, Pencil, Plus, Power } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { CrudForm, ToggleActiveDialog } from '../../components/CrudForm'
+import ExportarExcel from '../../components/ExportarExcel'
 import { IconButton, ListBox, Row } from '../../components/ListParts'
 import {
     Alert,
@@ -88,10 +89,13 @@ export default function Asignaciones() {
                 title="Asignaciones docentes"
                 subtitle="Define qué docente dicta cada asignatura en cada paralelo. Con esto el docente ve sus grupos."
             >
-                <Button onClick={() => setForm({})} disabled={Boolean(missing) || loadingCatalogs}>
-                    <Plus className="size-5" aria-hidden="true" />
-                    Nueva asignación
-                </Button>
+                <div className="flex flex-wrap items-start gap-2">
+                    <ExportarExcel url="/academic/asignaciones/exportar/" params={{ ...params, page: undefined }} archivo="asignaciones.xlsx" />
+                    <Button onClick={() => setForm({})} disabled={Boolean(missing) || loadingCatalogs}>
+                        <Plus className="size-5" aria-hidden="true" />
+                        Nueva asignación
+                    </Button>
+                </div>
             </PageHeader>
             {missing && !loadingCatalogs && (
                 <Alert tone="warn" className="mb-4">
