@@ -19,10 +19,11 @@ from apps.security.permissions import (
     IsRepresentante,
 )
 
-from . import alerta, evidencias, selectors, services
+from . import alerta, evidencias, ia, selectors, services
 from .models import ActividadRefuerzo, EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
 from .permissions import IsDocenteOrRepresentante
 from .serializers import (
+    GenerarRecursosIASerializer,
     EvidenciaSerializer,
     ActividadRefuerzoEditarSerializer,
     ActividadRefuerzoSerializer,
@@ -73,6 +74,38 @@ class RecursoViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(creado_por=self.request.user)
+
+    # --- Generación con IA (Gemini) -------------------------------------------
+    @action(detail=False, methods=["get"], url_path="ia")
+    def ia_config(self, request):
+        """GET recursos/ia/ — si la IA está disponible, límites y recomendaciones para el prompt."""
+        return Response({
+            "disponible": ia.disponible(),
+            "max_recursos": ia.max_recursos(),
+            "max_indicaciones": ia.MAX_INDICACIONES,
+            "min_indicaciones": ia.MIN_INDICACIONES,
+            "limite_por_hora": ia.limite_por_hora(),
+            "recomendaciones": ia.RECOMENDACIONES,
+            "ejemplos": ia.EJEMPLOS,
+        })
+
+    @action(detail=False, methods=["post"], url_path="generar-ia")
+    def generar_ia(self, request):
+        """
+        POST recursos/generar-ia/
+        {"tema": id, "nivel": "BASICO", "estrategia": "" | "INDIVIDUAL"..., "cantidad": 1-5,
+         "duracion_minutos": 5-120 | null, "indicaciones": "texto opcional"}
+        Devuelve propuestas para revisar; no guarda nada. Para guardarlas se usa POST recursos/
+        con "generado_ia": true.
+        """
+        datos = GenerarRecursosIASerializer(data=request.data, context={"request": request})
+        datos.is_valid(raise_exception=True)
+        d = datos.validated_data
+        resultado = ia.generar(
+            request.user, d["tema"], d["nivel"], d.get("estrategia") or "", d["cantidad"],
+            d.get("duracion_minutos"), d.get("indicaciones", ""),
+        )
+        return Response(resultado)
 
     def perform_update(self, serializer):
         user = self.request.user

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from apps.academic.models import Asignatura, Tema
 from apps.grades.models import Dificultad
@@ -9,6 +10,7 @@ from .models import (
     ActividadRefuerzo,
     EstrategiaRefuerzo,
     EvidenciaActividad,
+    NivelActividad,
     PlanRefuerzo,
     RecursoRefuerzo,
     TemaPlan,
@@ -318,6 +320,7 @@ class RecursoSerializer(serializers.ModelSerializer):
             "instrucciones",
             "duracion_minutos",
             "is_active",
+            "generado_ia",
             "creado_por",
             "creado_por_nombre",
             "created_at",
@@ -340,6 +343,9 @@ class RecursoSerializer(serializers.ModelSerializer):
                 {"tema": "El tema de un recurso no se puede cambiar una vez creado."}
             )
 
+        if inst is not None:
+            attrs.pop("generado_ia", None)  # el origen se fija al crear el recurso
+
         tema = attrs.get("tema", inst.tema if inst else None)
         titulo = attrs.get("titulo", inst.titulo if inst else None)
 
@@ -357,3 +363,43 @@ class RecursoSerializer(serializers.ModelSerializer):
         if titulo.casefold() in {t.casefold() for t in existentes.values_list("titulo", flat=True)}:
             raise serializers.ValidationError({"titulo": "Ya existe un recurso con ese título en este tema."})
         return attrs
+
+
+class GenerarRecursosIASerializer(serializers.Serializer):
+    """Solicitud de propuestas de recursos a la IA (no guarda nada)."""
+
+    tema = serializers.PrimaryKeyRelatedField(
+        queryset=Tema.objects.filter(is_active=True).select_related("grado", "asignatura", "padre"),
+        error_messages={"does_not_exist": "El tema no existe o está inactivo."},
+    )
+    nivel = serializers.ChoiceField(
+        choices=NivelActividad.choices, error_messages={"invalid_choice": "Elige un nivel válido."}
+    )
+    estrategia = serializers.ChoiceField(
+        choices=EstrategiaRefuerzo.choices, required=False, allow_blank=True,
+        error_messages={"invalid_choice": "Elige una estrategia válida."},
+    )
+    cantidad = serializers.IntegerField(min_value=1, default=3)
+    duracion_minutos = serializers.IntegerField(min_value=5, max_value=120, required=False, allow_null=True)
+    indicaciones = serializers.CharField(required=False, allow_blank=True, max_length=2000, trim_whitespace=True)
+
+    def validate_cantidad(self, value):
+        from . import ia
+
+        if value > ia.max_recursos():
+            raise serializers.ValidationError(f"Puedes pedir hasta {ia.max_recursos()} propuestas por vez.")
+        return value
+
+    def validate_indicaciones(self, value):
+        from . import ia
+
+        try:
+            return ia.validar_indicaciones(value)
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.detail["indicaciones"]) from None
+
+    def validate_tema(self, tema):
+        user = self.context["request"].user
+        if user.role == Role.DOCENTE and not selectors.docente_imparte_en_grado(user, tema.asignatura_id, tema.grado_id):
+            raise serializers.ValidationError("Solo puedes generar recursos de las asignaturas y grados que impartes.")
+        return tema

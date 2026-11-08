@@ -48,6 +48,8 @@ class RecursoRefuerzo(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(240)],
     )
     is_active = models.BooleanField("activo", default=True)
+    # Trazabilidad: el recurso nació de una propuesta de IA (revisada por una persona).
+    generado_ia = models.BooleanField("generado con IA", default=False)
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

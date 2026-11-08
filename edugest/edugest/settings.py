@@ -305,6 +305,14 @@ PLN_OCR_IDIOMA = env("PLN_OCR_IDIOMA", default="spa")
 PLN_OCR_TIMEOUT = env.int("PLN_OCR_TIMEOUT", default=30)
 TESSERACT_CMD = env("TESSERACT_CMD", default="")
 
+# Generación de recursos de refuerzo con IA (Google Gemini, clave de Google AI Studio).
+# Sin GEMINI_API_KEY la opción aparece deshabilitada y el banco funciona solo en modo manual.
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.8-flash")
+IA_TIMEOUT_SEGUNDOS = env.int("IA_TIMEOUT_SEGUNDOS", default=60)
+IA_MAX_RECURSOS_POR_SOLICITUD = env.int("IA_MAX_RECURSOS_POR_SOLICITUD", default=5)
+IA_LIMITE_POR_HORA = env.int("IA_LIMITE_POR_HORA", default=10)  # generaciones por usuario
+
 # ---------------------------------------------------------------------------
 # Correo (por ahora imprime en consola; se conectará a un servicio más adelante)
 # ---------------------------------------------------------------------------
