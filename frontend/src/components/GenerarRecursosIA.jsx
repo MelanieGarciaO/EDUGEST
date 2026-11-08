@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Lightbulb, RotateCcw, Sparkles } from 'lucide-react'
+import { ChevronDown, FileText, Lightbulb, Paperclip, RotateCcw, Sparkles, X } from 'lucide-react'
 
 import { api, parseApiError } from '../api/client'
 import { ESTRATEGIAS, NIVELES, temaLabel } from '../lib/format'
@@ -18,6 +18,74 @@ function validarIndicaciones(texto, config) {
     if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(t)) return 'No incluyas correos electrónicos ni datos personales.'
     if (/\b\d{9,}\b/.test(t)) return 'No incluyas cédulas, teléfonos u otros números de identificación.'
     return ''
+}
+
+/** Material de clase del docente (diapositivas, guías, fotos) que la IA usa como referencia. */
+function SelectorMaterial({ archivos, onChange, config, error }) {
+    const ref = useRef(null)
+    const [aviso, setAviso] = useState('')
+    const { max_archivos: maxArchivos, max_mb: maxMb, extensiones } = config
+
+    function agregar(e) {
+        const nuevos = Array.from(e.target.files ?? [])
+        e.target.value = ''
+        setAviso('')
+        const validos = []
+        for (const f of nuevos) {
+            const ext = `.${f.name.split('.').pop().toLowerCase()}`
+            if (!extensiones.includes(ext)) {
+                setAviso(`«${f.name}»: formato no admitido.`)
+                continue
+            }
+            if (f.size > maxMb * 1024 * 1024) {
+                setAviso(`«${f.name}» supera los ${maxMb} MB.`)
+                continue
+            }
+            if (archivos.some((a) => a.name === f.name && a.size === f.size)) continue
+            validos.push(f)
+        }
+        const total = [...archivos, ...validos]
+        if (total.length > maxArchivos) setAviso(`Puedes adjuntar hasta ${maxArchivos} archivos.`)
+        onChange(total.slice(0, maxArchivos))
+    }
+
+    return (
+        <div>
+            <p className="mb-1.5 text-sm font-bold text-ink-700">
+                Material de clase <span className="font-normal text-ink-500">(opcional)</span>
+            </p>
+            <p className="mb-2 text-xs text-ink-500">
+                {`Diapositivas, guías o fotos de la pizarra para que la IA se base en ellas. PDF, PPTX, DOCX, TXT o imágenes; hasta ${maxArchivos} archivos de ${maxMb} MB. No sube listas de estudiantes ni calificaciones.`}
+            </p>
+            <input ref={ref} type="file" multiple accept={extensiones.join(',')} className="hidden" onChange={agregar} />
+            {archivos.length > 0 && (
+                <ul className="mb-2 space-y-1.5">
+                    {archivos.map((f) => (
+                        <li key={`${f.name}-${f.size}`} className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-1.5 text-sm">
+                            <FileText className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+                            <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                            <span className="text-xs text-ink-500">{`${(f.size / 1024 / 1024).toFixed(1)} MB`}</span>
+                            <button
+                                type="button"
+                                onClick={() => onChange(archivos.filter((a) => a !== f))}
+                                aria-label={`Quitar ${f.name}`}
+                                className="grid size-7 place-items-center rounded-md text-ink-500 hover:bg-danger-50 hover:text-danger-600"
+                            >
+                                <X className="size-4" aria-hidden="true" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {archivos.length < maxArchivos && (
+                <Button variant="ghost" onClick={() => ref.current?.click()}>
+                    <Paperclip className="size-4" aria-hidden="true" />
+                    {archivos.length ? 'Agregar otro archivo' : 'Adjuntar material'}
+                </Button>
+            )}
+            {(aviso || error) && <p className="mt-1 text-xs font-medium text-danger-600">{error || aviso}</p>}
+        </div>
+    )
 }
 
 function Propuesta({ p, onChange }) {
@@ -65,6 +133,7 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
     const [cargando, setCargando] = useState('')
     const [resultado, setResultado] = useState(null) // { propuestas, advertencias }
     const [verConsejos, setVerConsejos] = useState(false)
+    const [archivos, setArchivos] = useState([])
     const set = (k) => (e) => setValores((v) => ({ ...v, [k]: e.target.value }))
 
     async function generar() {
@@ -81,18 +150,24 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
 
         setCargando('generar')
         try {
-            const { data } = await api.post(
-                `${ENDPOINT}generar-ia/`,
-                {
-                    tema: Number(valores.tema),
-                    nivel: valores.nivel,
-                    estrategia: valores.estrategia,
-                    cantidad: Number(valores.cantidad),
-                    duracion_minutos: minutos,
-                    indicaciones: valores.indicaciones.trim(),
-                },
-                { timeout: 90_000 },
-            )
+            // Con material se envía multipart (archivos); sin material, JSON.
+            const campos = {
+                tema: Number(valores.tema),
+                nivel: valores.nivel,
+                estrategia: valores.estrategia,
+                cantidad: Number(valores.cantidad),
+                indicaciones: valores.indicaciones.trim(),
+                ...(minutos !== null ? { duracion_minutos: minutos } : {}),
+            }
+            let cuerpo = campos
+            let opciones = { timeout: 180_000 } // mayor que IA_TIMEOUT_SEGUNDOS del backend
+            if (archivos.length) {
+                cuerpo = new FormData()
+                Object.entries(campos).forEach(([k, v]) => cuerpo.append(k, String(v)))
+                archivos.forEach((f) => cuerpo.append('materiales', f))
+                opciones = { ...opciones, headers: { 'Content-Type': 'multipart/form-data' } }
+            }
+            const { data } = await api.post(`${ENDPOINT}generar-ia/`, cuerpo, opciones)
             setResultado({
                 ...data,
                 propuestas: data.propuestas.map((p, i) => ({ ...p, clave: `${Date.now()}-${i}`, incluir: true, guardado: false })),
@@ -155,7 +230,7 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
                         </Button>
                         <Button onClick={generar} loading={cargando === 'generar'}>
                             <Sparkles className="size-4" aria-hidden="true" />
-                            {cargando === 'generar' ? 'Generando…' : 'Generar propuestas'}
+                            {cargando === 'generar' ? 'Generando… (puede tardar hasta 2 min)' : 'Generar propuestas'}
                         </Button>
                     </>
                 ) : (
@@ -265,18 +340,32 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
                             </div>
                         )}
                     </div>
+                    {config.material && (
+                        <SelectorMaterial archivos={archivos} onChange={setArchivos} config={config.material} error={errores.materiales} />
+                    )}
                     <p className="text-xs text-ink-500">
-                        La IA solo recibe la asignatura, el grado, el tema y tus indicaciones; nunca datos de estudiantes. Las propuestas no se guardan hasta que las revises.
+                        La IA solo recibe la asignatura, el grado, el tema, tus indicaciones y el material que adjuntes (sin correos, cédulas ni teléfonos); nunca datos de estudiantes del sistema. Las propuestas no se guardan hasta que las revises.
                         {` Límite: ${config.limite_por_hora} generaciones por hora.`}
                     </p>
                 </div>
             ) : (
                 <div className="space-y-4">
+                    {resultado.material && (
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-ink-700">
+                            <span className="font-bold">Basado en:</span>
+                            {resultado.material.archivos.map((n) => (
+                                <Chip key={n} tone={resultado.material.relacionado ? 'brand' : 'warn'}>
+                                    {n}
+                                </Chip>
+                            ))}
+                        </div>
+                    )}
                     {resultado.advertencias.map((a) => (
                         <Alert key={a} tone="warn">
                             {a}
                         </Alert>
                     ))}
+                    {resultado.modelo && <p className="text-xs text-ink-500">{`Modelo usado: ${resultado.modelo}`}</p>}
                     <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
                         {resultado.propuestas.map((p, i) => (
                             <Propuesta
