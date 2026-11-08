@@ -30,3 +30,23 @@ STORAGES = {
     **STORAGES,  # noqa: F405
     "evidencias": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
 }
+
+# Base de datos para las pruebas. Por defecto es la misma del .env, pero si apunta a
+# Supabase las pruebas son lentas y al final Django no puede borrar «test_postgres»
+# porque el pooler deja una conexión abierta. Para evitarlo, define en el .env una
+# PostgreSQL local SOLO para pruebas (Django crea y borra ahí la base «test_<nombre>»):
+#   TEST_DB_HOST=localhost
+#   TEST_DB_NAME=edugest
+#   TEST_DB_USER=postgres
+#   TEST_DB_PASSWORD=tu_password_local
+#   TEST_DB_PORT=5432
+if env("TEST_DB_HOST", default=""):  # noqa: F405
+    DATABASES["default"].update(  # noqa: F405
+        NAME=env("TEST_DB_NAME", default="edugest"),  # noqa: F405
+        USER=env("TEST_DB_USER", default="postgres"),  # noqa: F405
+        PASSWORD=env("TEST_DB_PASSWORD", default=""),  # noqa: F405
+        HOST=env("TEST_DB_HOST"),  # noqa: F405
+        PORT=env("TEST_DB_PORT", default="5432"),  # noqa: F405
+        CONN_MAX_AGE=0,
+        OPTIONS={"sslmode": "disable"},
+    )

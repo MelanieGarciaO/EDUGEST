@@ -41,3 +41,6 @@ share/python-wheels/
 *.egg
 # Evidencias locales (fotos de estudiantes): nunca al repositorio
 privado/
+
+# Static files
+staticfiles/
