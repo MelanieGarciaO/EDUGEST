@@ -5,6 +5,7 @@ import { ClipboardList, Pencil, Plus, Power } from 'lucide-react'
 import { api, parseApiError } from '../../api/client'
 import { CrudForm, ToggleActiveDialog } from '../../components/CrudForm'
 import ExportarExcel from '../../components/ExportarExcel'
+import ImportarExcel from '../../components/ImportarExcel'
 import { IconButton, ListBox, Row } from '../../components/ListParts'
 import {
     Alert,
@@ -91,6 +92,17 @@ export default function Asignaciones() {
             >
                 <div className="flex flex-wrap items-start gap-2">
                     <ExportarExcel url="/academic/asignaciones/exportar/" params={{ ...params, page: undefined }} archivo="asignaciones.xlsx" />
+                    <ImportarExcel
+                        endpoint="/academic/asignaciones/"
+                        titulo="Importar asignaciones"
+                        columnas={[
+                            { campo: 'docente', titulo: 'Docente' },
+                            { campo: 'paralelo', titulo: 'Paralelo' },
+                            { campo: 'asignatura', titulo: 'Asignatura' },
+                        ]}
+                        disabled={Boolean(missing) || loadingCatalogs}
+                        motivo={missing}
+                    />
                     <Button onClick={() => setForm({})} disabled={Boolean(missing) || loadingCatalogs}>
                         <Plus className="size-5" aria-hidden="true" />
                         Nueva asignación

@@ -284,7 +284,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
             aria-label={title}
             className={cx(
                 'm-auto w-[calc(100%-2rem)] rounded-2xl bg-white p-0 text-ink-900 shadow-xl backdrop:bg-navy-900/60',
-                size === 'lg' ? 'max-w-xl' : 'max-w-md',
+                size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-xl' : 'max-w-md',
             )}
         >
             {open && (

@@ -2,6 +2,8 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
 from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
@@ -9,7 +11,7 @@ from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
 from . import selectors
 from .grados import grado_maximo, grado_minimo
 from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Tema
-from . import exportaciones
+from . import exportaciones, importaciones
 from .serializers import (
     AsignaturaSerializer,
     AsignacionDocenteSerializer,
@@ -59,6 +61,39 @@ class AcademicViewSet(viewsets.ModelViewSet):
         return respuesta
 
 
+class ImportacionMixin:
+    """
+    Agrega a un viewset la importación masiva desde Excel/CSV (solo administrador;
+    los permisos los da AcademicViewSet porque no son list/retrieve).
+    """
+
+    importacion = None  # configuración en importaciones.py
+
+    @action(detail=False, methods=["get"])
+    def plantilla(self, request):
+        """GET .../plantilla/ — Excel con listas desplegables de valores válidos."""
+        importaciones.exigir_requisitos(self.importacion)
+        respuesta = HttpResponse(importaciones.generar_plantilla(self.importacion), content_type=importaciones.CONTENT_TYPE)
+        nombre = f"plantilla_{self.importacion['clave']}.xlsx"
+        respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        respuesta["Cache-Control"] = "no-store"
+        return respuesta
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    def importar(self, request):
+        """
+        POST .../importar/ (multipart: archivo, confirmar=true|false)
+        Sin confirmar devuelve la vista previa; confirmando registra todo o nada.
+        """
+        confirmar = str(request.data.get("confirmar", "")).lower() == "true"
+        resultado = importaciones.importar(self.importacion, request.FILES.get("archivo"), confirmar)
+        if confirmar and resultado["errores"]:
+            return Response(
+                {"archivo": [importaciones.MENSAJE_CON_ERRORES], "vista_previa": resultado}, status=400
+            )
+        return Response(resultado)
+
+
 class GradoViewSet(AcademicViewSet):
     serializer_class = GradoSerializer
 
@@ -90,8 +125,9 @@ class ParaleloViewSet(AcademicViewSet):
         return qs.order_by("grado__orden", "nombre")
 
 
-class EstudianteViewSet(AcademicViewSet):
+class EstudianteViewSet(ImportacionMixin, AcademicViewSet):
     serializer_class = EstudianteSerializer
+    importacion = importaciones.ESTUDIANTES
 
     def get_queryset(self):
         params = self.request.query_params
@@ -111,8 +147,9 @@ class EstudianteViewSet(AcademicViewSet):
         return self._descargar_excel(exportaciones.estudiantes(qs, request))
 
 
-class AsignacionDocenteViewSet(AcademicViewSet):
+class AsignacionDocenteViewSet(ImportacionMixin, AcademicViewSet):
     serializer_class = AsignacionDocenteSerializer
+    importacion = importaciones.ASIGNACIONES
 
     def get_queryset(self):
         params = self.request.query_params

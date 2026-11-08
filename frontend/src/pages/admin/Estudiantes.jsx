@@ -5,6 +5,7 @@ import { GraduationCap, Pencil, Plus, Power, Search } from 'lucide-react'
 import { api, parseApiError } from '../../api/client'
 import { CrudForm, ToggleActiveDialog } from '../../components/CrudForm'
 import ExportarExcel from '../../components/ExportarExcel'
+import ImportarExcel from '../../components/ImportarExcel'
 import { IconButton, ListBox, Row } from '../../components/ListParts'
 import {
     Alert,
@@ -82,6 +83,18 @@ export default function Estudiantes() {
             <PageHeader title="Estudiantes" subtitle="Cada estudiante pertenece a un paralelo y está vinculado a un representante.">
                 <div className="flex flex-wrap items-start gap-2">
                     <ExportarExcel url="/academic/estudiantes/exportar/" params={{ ...params, page: undefined }} archivo="estudiantes.xlsx" />
+                    <ImportarExcel
+                        endpoint="/academic/estudiantes/"
+                        titulo="Importar estudiantes"
+                        columnas={[
+                            { campo: 'nombres', titulo: 'Nombres' },
+                            { campo: 'apellidos', titulo: 'Apellidos' },
+                            { campo: 'paralelo', titulo: 'Paralelo' },
+                            { campo: 'representante', titulo: 'Representante' },
+                        ]}
+                        disabled={Boolean(missing) || paralelos.isPending || representantes.isPending}
+                        motivo={missing}
+                    />
                     <Button onClick={() => setForm({})} disabled={Boolean(missing) || paralelos.isPending || representantes.isPending}>
                         <Plus className="size-5" aria-hidden="true" />
                         Nuevo estudiante
