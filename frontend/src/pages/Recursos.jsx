@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Library, Pencil, Plus, Power, Search } from 'lucide-react'
+import { Library, Pencil, Plus, Power, Search, Sparkles } from 'lucide-react'
 
 import { api, parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { ToggleActiveDialog } from '../components/CrudForm'
+import GenerarRecursosIA from '../components/GenerarRecursosIA'
 import { IconButton, ListBox } from '../components/ListParts'
 import {
     Alert,
@@ -167,6 +168,7 @@ export default function Recursos() {
     const [page, setPage] = useState(1)
     const [form, setForm] = useState(null)
     const [toggle, setToggle] = useState(null)
+    const [generarIA, setGenerarIA] = useState(false)
     const debounced = useDebouncedValue(search)
 
     const grados = useGrados()
@@ -193,6 +195,13 @@ export default function Recursos() {
     }
 
     const items = list.data?.results ?? []
+    const iaConfig = useQuery({
+        queryKey: ['recursos', 'ia-config'],
+        queryFn: async () => (await api.get(`${ENDPOINT}ia/`)).data,
+        staleTime: 5 * 60_000,
+    })
+    const iaDisponible = Boolean(iaConfig.data?.disponible)
+
     const canEdit = (r) => isAdmin || r.creado_por === user.id
 
     return (
@@ -201,10 +210,21 @@ export default function Recursos() {
                 title="Banco de recursos"
                 subtitle="Actividades de refuerzo por tema y nivel. De aquí salen las propuestas de los planes de refuerzo."
             >
-                <Button onClick={() => setForm({})} disabled={!temas.data?.length}>
-                    <Plus className="size-5" aria-hidden="true" />
-                    Nuevo recurso
-                </Button>
+                <div className="flex flex-wrap items-start gap-2">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setGenerarIA(true)}
+                        disabled={!temas.data?.length || !iaDisponible}
+                        title={iaConfig.data && !iaDisponible ? 'La generación con IA no está configurada en el servidor.' : undefined}
+                    >
+                        <Sparkles className="size-5" aria-hidden="true" />
+                        Generar con IA
+                    </Button>
+                    <Button onClick={() => setForm({})} disabled={!temas.data?.length}>
+                        <Plus className="size-5" aria-hidden="true" />
+                        Nuevo recurso
+                    </Button>
+                </div>
             </PageHeader>
             {!temas.isPending && !temas.data?.length && (
                 <Alert tone="warn" className="mb-4">
@@ -290,6 +310,7 @@ export default function Recursos() {
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Chip tone={NIVEL_TONE[r.nivel]}>{NIVEL_LABEL[r.nivel]}</Chip>
                                         <Chip>{ESTRATEGIA_LABEL[r.estrategia]}</Chip>
+                                        {r.generado_ia && <Chip tone="warn">Generado con IA</Chip>}
                                         {!r.is_active && <Chip tone="danger">Inactivo</Chip>}
                                     </div>
                                     {canEdit(r) && (
@@ -315,6 +336,7 @@ export default function Recursos() {
             )}
 
             {form && <RecursoForm item={form.item} temas={temas.data ?? []} onClose={() => setForm(null)} />}
+            {generarIA && iaConfig.data && <GenerarRecursosIA temas={temas.data ?? []} config={iaConfig.data} onClose={() => setGenerarIA(false)} />}
             <ToggleActiveDialog item={toggle} endpoint={ENDPOINT} name={toggle?.titulo} noun="recurso" onClose={() => setToggle(null)} />
         </>
     )
