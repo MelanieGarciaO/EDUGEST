@@ -19,7 +19,7 @@ from apps.security.permissions import (
     IsRepresentante,
 )
 
-from . import alerta, evidencias, ia, selectors, services
+from . import alerta, evidencias, ia, materiales, selectors, services
 from .models import ActividadRefuerzo, EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
 from .permissions import IsDocenteOrRepresentante
 from .serializers import (
@@ -86,24 +86,33 @@ class RecursoViewSet(viewsets.ModelViewSet):
             "min_indicaciones": ia.MIN_INDICACIONES,
             "limite_por_hora": ia.limite_por_hora(),
             "recomendaciones": ia.RECOMENDACIONES,
+            "material": {
+                "max_archivos": materiales.max_archivos(),
+                "max_mb": materiales.max_mb(),
+                "extensiones": list(materiales.EXTENSIONES),
+            },
             "ejemplos": ia.EJEMPLOS,
         })
 
-    @action(detail=False, methods=["post"], url_path="generar-ia")
+    @action(detail=False, methods=["post"], url_path="generar-ia", parser_classes=[JSONParser, MultiPartParser])
     def generar_ia(self, request):
         """
         POST recursos/generar-ia/
         {"tema": id, "nivel": "BASICO", "estrategia": "" | "INDIVIDUAL"..., "cantidad": 1-5,
          "duracion_minutos": 5-120 | null, "indicaciones": "texto opcional"}
+        Opcional (multipart): «materiales» = hasta 3 archivos PDF, PPTX, DOCX, TXT o imágenes
+        con el material de clase del docente, que la IA usa como referencia.
         Devuelve propuestas para revisar; no guarda nada. Para guardarlas se usa POST recursos/
         con "generado_ia": true.
         """
         datos = GenerarRecursosIASerializer(data=request.data, context={"request": request})
         datos.is_valid(raise_exception=True)
         d = datos.validated_data
+        # Material de referencia opcional (multipart, campo «materiales»; se procesa en memoria).
+        material = materiales.procesar(request.FILES.getlist("materiales")) if request.FILES else None
         resultado = ia.generar(
             request.user, d["tema"], d["nivel"], d.get("estrategia") or "", d["cantidad"],
-            d.get("duracion_minutos"), d.get("indicaciones", ""),
+            d.get("duracion_minutos"), d.get("indicaciones", ""), material,
         )
         return Response(resultado)
 

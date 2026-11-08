@@ -308,10 +308,21 @@ TESSERACT_CMD = env("TESSERACT_CMD", default="")
 # Generación de recursos de refuerzo con IA (Google Gemini, clave de Google AI Studio).
 # Sin GEMINI_API_KEY la opción aparece deshabilitada y el banco funciona solo en modo manual.
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
-GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.8-flash")
-IA_TIMEOUT_SEGUNDOS = env.int("IA_TIMEOUT_SEGUNDOS", default=60)
+# Principal: Flash-Lite (rápido, lee PDF e imágenes). Si está saturado (503), no responde a
+# tiempo (504), agotó su cuota (429) o no existe para la clave (404), se prueban los de respaldo.
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.5-flash-lite")
+GEMINI_MODELOS_RESPALDO = env.list("GEMINI_MODELOS_RESPALDO", default=["gemini-3.6-flash", "gemini-3.8-flash"])
+# Plazo máximo de respuesta; el SDK también se lo envía a Google (si es corto -> 504).
+IA_TIMEOUT_SEGUNDOS = env.int("IA_TIMEOUT_SEGUNDOS", default=150)
+# Nivel de razonamiento del modelo (minimal | low | medium | high). Más bajo = más rápido.
+IA_NIVEL_RAZONAMIENTO = env("IA_NIVEL_RAZONAMIENTO", default="low")
 IA_MAX_RECURSOS_POR_SOLICITUD = env.int("IA_MAX_RECURSOS_POR_SOLICITUD", default=5)
 IA_LIMITE_POR_HORA = env.int("IA_LIMITE_POR_HORA", default=10)  # generaciones por usuario
+# Material de referencia que el docente adjunta para la IA (diapositivas, guías, fotos).
+IA_MATERIAL_MAX_ARCHIVOS = env.int("IA_MATERIAL_MAX_ARCHIVOS", default=3)
+IA_MATERIAL_MAX_MB = env.int("IA_MATERIAL_MAX_MB", default=10)  # por archivo
+IA_MATERIAL_MAX_PAGINAS = env.int("IA_MATERIAL_MAX_PAGINAS", default=30)  # páginas o diapositivas
+IA_MATERIAL_MAX_CARACTERES = env.int("IA_MATERIAL_MAX_CARACTERES", default=15000)  # texto enviado a la IA
 
 # ---------------------------------------------------------------------------
 # Correo (por ahora imprime en consola; se conectará a un servicio más adelante)

@@ -159,17 +159,96 @@ class GenerarIATests(RefuerzoBase):
         self.assertTrue(recurso.generado_ia)
 
 
-class ErroresDelServicioTests(RefuerzoBase):
-    """Traducción de errores reales del SDK de Gemini."""
+@override_settings(
+    GEMINI_API_KEY="clave-de-prueba", GEMINI_MODEL="modelo-a", GEMINI_MODELOS_RESPALDO=["modelo-b"],
+    IA_TIMEOUT_SEGUNDOS=150,
+)
+class ConexionGeminiTests(RefuerzoBase):
+    """Streaming, plazo, reintentos y modelos de respaldo, con errores reales del SDK."""
 
-    @override_settings(GEMINI_API_KEY="clave-de-prueba")
-    def test_errores_del_sdk(self):
+    STREAM = "google.genai.models.Models.generate_content_stream"
+
+    def error(self, codigo, mensaje="x"):
         from google.genai import errors
 
-        casos = [(429, ia.IALimite), (400, ia.IANoDisponible), (403, ia.IANoDisponible), (404, ia.IANoDisponible), (500, ia.IAError)]
-        for codigo, excepcion in casos:
-            clase = errors.ClientError if codigo < 500 else errors.ServerError
-            error = clase(codigo, {"error": {"code": codigo, "message": "x", "status": "X"}})
-            with self.subTest(codigo=codigo), mock.patch("google.genai.models.Models.generate_content", side_effect=error):
-                with self.assertRaises(excepcion):
-                    ia._llamar_modelo("sistema", "prompt", {"type": "object"})
+        clase = errors.ClientError if codigo < 500 else errors.ServerError
+        return clase(codigo, {"error": {"code": codigo, "message": mensaje, "status": "X"}})
+
+    def stream(self, texto=None):
+        texto = texto or respuesta("Una actividad")
+        mitad = len(texto) // 2
+        return iter([mock.Mock(text=texto[:mitad]), mock.Mock(text=None), mock.Mock(text=texto[mitad:])])
+
+    def llamar(self, efectos, **extra):
+        with mock.patch(self.STREAM, side_effect=efectos) as gen:
+            resultado = ia._llamar_modelo("s", "p", {"type": "object"}, **extra)
+        return resultado, gen
+
+    def test_une_la_respuesta_por_partes(self):
+        (texto, modelo), gen = self.llamar([self.stream()])
+        self.assertEqual(json.loads(texto)["recursos"][0]["titulo"], "Una actividad")
+        self.assertEqual(modelo, "modelo-a")
+        self.assertEqual(gen.call_args.kwargs["config"].thinking_config.thinking_level.value, "LOW")
+
+    def test_el_plazo_se_envia_en_milisegundos(self):
+        with mock.patch("google.genai.Client") as cliente:
+            cliente.return_value.models.generate_content_stream.return_value = self.stream()
+            ia._llamar_modelo("s", "p", {"type": "object"})
+        self.assertEqual(cliente.call_args.kwargs["http_options"].timeout, 150_000)
+
+    def test_503_se_reintenta_en_el_mismo_modelo(self):
+        (_, modelo), gen = self.llamar([self.error(503), self.stream()])
+        self.assertEqual((modelo, gen.call_count), ("modelo-a", 2))
+
+    def test_saturado_o_lento_pasa_al_modelo_de_respaldo(self):
+        for efectos in ([self.error(503), self.error(503), self.stream()], [self.error(504), self.stream()],
+                        [self.error(429), self.stream()], [self.error(404), self.stream()]):
+            with self.subTest(codigo=efectos[0].code):
+                (_, modelo), gen = self.llamar(efectos)
+                self.assertEqual(modelo, "modelo-b")
+                self.assertEqual(gen.call_args.kwargs["model"], "modelo-b")
+
+    def test_todos_saturados(self):
+        with self.assertRaises(ia.IAError) as ctx:
+            self.llamar([self.error(504), self.error(504)])
+        self.assertIn("saturado", str(ctx.exception.detail))
+
+    def test_todos_sin_cuota(self):
+        with self.assertRaises(ia.IALimite):
+            self.llamar([self.error(429), self.error(429)])
+
+    def test_ningun_modelo_existe(self):
+        with self.assertRaises(ia.IANoDisponible) as ctx:
+            self.llamar([self.error(404), self.error(404)])
+        self.assertIn("modelo-a, modelo-b", str(ctx.exception.detail))
+
+    def test_clave_invalida_no_prueba_otros_modelos(self):
+        for codigo in (400, 403):
+            with self.subTest(codigo=codigo), self.assertRaises(ia.IANoDisponible):
+                self.llamar([self.error(codigo), self.stream()])
+
+    def test_modelo_sin_thinking_reintenta_sin_esa_opcion(self):
+        (_, modelo), gen = self.llamar([self.error(400, "Thinking level is not supported."), self.stream()])
+        self.assertEqual(modelo, "modelo-a")
+        self.assertIsNone(gen.call_args.kwargs["config"].thinking_config)
+
+    def test_error_durante_el_streaming_pasa_al_respaldo(self):
+        def corta():
+            yield mock.Mock(text='{"recursos": [')
+            raise self.error(504)
+
+        (_, modelo), _ = self.llamar([corta(), self.stream()])
+        self.assertEqual(modelo, "modelo-b")
+
+    def test_adjuntos_se_envian_como_partes(self):
+        _, gen = self.llamar([self.stream()], adjuntos=[("a.png", "image/jpeg", b"123")])
+        contenido = gen.call_args.kwargs["contents"]
+        self.assertEqual(contenido[0], "p")
+        self.assertEqual(contenido[1].inline_data.mime_type, "image/jpeg")
+
+    def test_la_respuesta_informa_el_modelo_usado(self):
+        self.auth(self.doc1)
+        with mock.patch.object(ia, "_llamar_modelo", return_value=(respuesta("Fracciones en la feria"), "modelo-b")):
+            res = self.client.post(reverse("recurso-generar-ia"),
+                                   {"tema": self.fracciones.id, "nivel": "BASICO", "cantidad": 1}, format="json")
+        self.assertEqual(res.data["modelo"], "modelo-b")
