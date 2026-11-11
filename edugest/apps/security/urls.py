@@ -9,6 +9,8 @@ from .views import (
     LoginView,
     LogoutView,
     MeView,
+    RecuperarSolicitarView,
+    RecuperarVerificarView,
     UserViewSet,
 )
 
@@ -22,6 +24,8 @@ urlpatterns = [
     path("auth/me/", MeView.as_view(), name="me"),
     path("auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("auth/aceptar-terminos/", AceptarTerminosView.as_view(), name="aceptar-terminos"),
+    path("auth/recuperar/solicitar/", RecuperarSolicitarView.as_view(), name="recuperar-solicitar"),
+    path("auth/recuperar/verificar/", RecuperarVerificarView.as_view(), name="recuperar-verificar"),
     path("legal/", LegalInfoView.as_view(), name="legal"),
     *router.urls,
 ]

@@ -118,9 +118,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if password is None:
             password = generate_temporary_password()
             self._generated_password = password
-        return User.objects.create_user(
+        usuario = User.objects.create_user(
             password=password, must_change_password=True, **validated_data
         )
+        from . import avisos
+
+        avisos.cuenta_creada(usuario, password)  # bienvenida con la contraseña temporal
+        return usuario
 
     def to_representation(self, instance):
         data = UserSerializer(instance).data

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { BarChart3, ClipboardList, FileDown, GraduationCap, Home, LifeBuoy, Library, ListTree, LogOut, Menu, School, TriangleAlert, UserRound, Users, X } from 'lucide-react'
+import { Bell, BarChart3, ClipboardList, FileDown, GraduationCap, Home, LifeBuoy, Library, ListTree, LogOut, Menu, School, TriangleAlert, UserRound, Users, X } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+
+import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { Avatar, Logo, cx } from '../components/ui'
@@ -40,13 +43,26 @@ function navFor(user) {
         ...(user.role === 'ADMINISTRADOR' ? ADMIN_NAV : []),
         ...(user.role === 'DOCENTE' ? DOCENTE_NAV : []),
         ...(user.role === 'REPRESENTANTE' ? REPRESENTANTE_NAV : []),
+        { to: '/notificaciones', label: 'Notificaciones', icon: Bell, contador: true },
         { to: '/perfil', label: 'Perfil', icon: UserRound },
     ]
+}
+
+/** Avisos sin leer (se actualiza cada minuto y al volver a la pestaña). */
+function useNoLeidas() {
+    const { data } = useQuery({
+        queryKey: ['notificaciones', 'resumen'],
+        queryFn: async () => (await api.get('/notifications/resumen/')).data,
+        refetchInterval: 60_000,
+        refetchOnWindowFocus: true,
+    })
+    return data?.no_leidas ?? 0
 }
 
 function SidebarContent({ onNavigate }) {
     const { user, logout } = useAuth()
     const [leaving, setLeaving] = useState(false)
+    const noLeidas = useNoLeidas()
 
     return (
         <div className="flex h-full flex-col">
@@ -54,7 +70,7 @@ function SidebarContent({ onNavigate }) {
                 <Logo light />
             </div>
             <nav aria-label="Principal" className="flex-1 space-y-1 p-3">
-                {navFor(user).map(({ to, label, icon: Icon, end }) => (
+                {navFor(user).map(({ to, label, icon: Icon, end, contador }) => (
                     <NavLink
                         key={to}
                         to={to}
@@ -69,6 +85,12 @@ function SidebarContent({ onNavigate }) {
                     >
                         <Icon className="size-5" aria-hidden="true" />
                         {label}
+                        {contador && noLeidas > 0 && (
+                            <span className="ml-auto grid min-w-6 place-items-center rounded-full bg-danger-600 px-1.5 text-xs font-bold text-white">
+                                {noLeidas > 99 ? '99+' : noLeidas}
+                                <span className="sr-only"> sin leer</span>
+                            </span>
+                        )}
                     </NavLink>
                 ))}
             </nav>

@@ -105,3 +105,27 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_representante(self):
         return self.role == Role.REPRESENTANTE
+
+
+class CodigoRecuperacion(models.Model):
+    """
+    Código OTP de 6 dígitos para recuperar la contraseña. Solo se guarda su hash (como una
+    contraseña): ni la base de datos ni el admin conocen el código. Caduca y admite pocos intentos.
+    """
+
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="codigos_recuperacion")
+    codigo_hash = models.CharField(max_length=128)
+    expira_en = models.DateTimeField()
+    intentos = models.PositiveSmallIntegerField(default=0)
+    usado_en = models.DateTimeField(null=True, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "código de recuperación"
+        verbose_name_plural = "códigos de recuperación"
+
+    @property
+    def vigente(self):
+        return self.usado_en is None and self.expira_en > timezone.now()

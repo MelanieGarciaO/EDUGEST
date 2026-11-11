@@ -1,17 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { api, parseApiError } from '../api/client'
 import { Alert, Button, PasswordField } from './ui'
 
 const MIN = 10
 const VACIO = { actual: '', nueva: '', repetir: '' }
+const CLAVE_TEMPORAL = 'edugest:clave-temporal' // la deja la pantalla de recuperación
 
 /**
  * Formulario de cambio de contraseña (lo usan el primer acceso y el Perfil).
  * Llama a onSuccess(data) con la respuesta del servidor (tokens nuevos y usuario).
  */
 export default function CambiarClaveForm({ forced = false, onSuccess, secondaryAction }) {
-    const [form, setForm] = useState(VACIO)
+    // Tras recuperar la cuenta con código, la contraseña actual (temporal) ya se conoce.
+    const [form, setForm] = useState(() => ({
+        ...VACIO,
+        actual: forced ? sessionStorage.getItem(CLAVE_TEMPORAL) ?? '' : '',
+    }))
+    useEffect(() => {
+        sessionStorage.removeItem(CLAVE_TEMPORAL) // se usa una sola vez
+    }, [])
     const [errors, setErrors] = useState({})
     const [general, setGeneral] = useState('')
     const [loading, setLoading] = useState(false)

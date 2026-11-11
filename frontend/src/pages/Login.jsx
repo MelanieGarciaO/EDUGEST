@@ -87,7 +87,10 @@ export default function Login() {
                         Ingresar
                     </Button>
                     <p className="mt-5 text-sm text-ink-500">
-                        ¿Olvidaste tu contraseña? Solicita una nueva a la administración de tu institución.
+                        <Link to="/recuperar" className="font-bold text-brand-700 hover:underline">
+                            ¿Olvidaste tu contraseña?
+                        </Link>{' '}
+                        Recupérala con un código que te enviamos al correo.
                     </p>
                     <p className="mt-6 border-t border-line pt-4 text-sm text-ink-500">
                         Al ingresar aceptas los{' '}

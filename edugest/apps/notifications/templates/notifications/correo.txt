@@ -1,0 +1,18 @@
+{% autoescape off %}{{ correo.asunto }}
+
+Hola, {{ nombre }}:
+{% for p in correo.parrafos %}
+{{ p }}
+{% endfor %}{% if correo.destacado %}
+    {{ correo.destacado }}
+{% endif %}{% for etiqueta, valor in correo.detalles %}
+- {{ etiqueta }}: {{ valor }}{% endfor %}
+{% if correo.boton %}
+{{ correo.boton.0 }}: {{ boton_url }}
+{% endif %}{% if correo.nota %}
+{{ correo.nota }}
+{% endif %}
+--
+Mensaje automático de EduGest ({{ institucion }}). No respondas a este correo.
+Elige qué avisos recibir en: {{ url_preferencias }}
+{% endautoescape %}

@@ -8,8 +8,10 @@ import AceptarTerminos from './pages/AceptarTerminos'
 import ChangePassword from './pages/ChangePassword'
 import DocenteHome from './pages/DocenteHome'
 import Login from './pages/Login'
+import Recuperar from './pages/Recuperar'
 import NotFound from './pages/NotFound'
 import Profile from './pages/Profile'
+import Notificaciones from './pages/Notificaciones'
 import RepresentanteHome from './pages/RepresentanteHome'
 import Users from './pages/admin/Users'
 import Academico from './pages/admin/Academico'
@@ -36,6 +38,7 @@ export default function App() {
     <Routes>
       <Route element={<PublicOnly />}>
         <Route path="/login" element={<Login />} />
+        <Route path="/recuperar" element={<Recuperar />} />
       </Route>
 
       <Route element={<RequireAuth />}>
@@ -73,6 +76,7 @@ export default function App() {
             <Route path="/representante/reportes" element={<Reportes />} />
           </Route>
           <Route path="/perfil" element={<Profile />} />
+          <Route path="/notificaciones" element={<Notificaciones />} />
         </Route>
       </Route>
 

@@ -9,6 +9,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from . import avisos, recuperacion
 from .models import Role, User
 from .permissions import IsAdministrador
 from .serializers import (
@@ -106,6 +107,7 @@ class ChangePasswordView(APIView):
         user.save(update_fields=["password", "must_change_password", "updated_at"])
 
         revoke_user_tokens(user)
+        avisos.clave_cambiada(user)
         refresh = LoginSerializer.get_token(user)
         return Response(
             {
@@ -189,9 +191,43 @@ class UserViewSet(viewsets.ModelViewSet):
         user.must_change_password = True
         user.save(update_fields=["password", "must_change_password", "updated_at"])
         revoke_user_tokens(user)
+        avisos.clave_restablecida(user, temporary_password, por=request.user)
         return Response(
             {
-                "detail": "Contraseña temporal generada. Entrégala al usuario; no se volverá a mostrar.",
+                "detail": "Contraseña temporal generada y enviada al correo del usuario. "
+                "Entrégala también si hace falta; no se volverá a mostrar.",
                 "temporary_password": temporary_password,
             }
         )
+
+
+# ---------------------------------------------------------------------------
+# Recuperación de contraseña con código OTP (público, sin sesión)
+# ---------------------------------------------------------------------------
+def _ip(request):
+    return request.META.get("REMOTE_ADDR") or None
+
+
+class RecuperarSolicitarView(APIView):
+    """POST {email}: envía un código de 6 dígitos si la cuenta existe (respuesta idéntica si no)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        recuperacion.solicitar(request.data.get("email"), _ip(request))
+        return Response({"detail": recuperacion.MENSAJE_SOLICITUD})
+
+
+class RecuperarVerificarView(APIView):
+    """POST {email, codigo}: si el código es válido, devuelve una contraseña temporal (una sola vez)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        temporal = recuperacion.verificar(request.data.get("email"), request.data.get("codigo"), _ip(request))
+        return Response({
+            "detail": "Código verificado. Usa esta contraseña temporal para ingresar y crear tu contraseña nueva.",
+            "temporary_password": temporal,
+        })

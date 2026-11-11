@@ -50,3 +50,7 @@ if env("TEST_DB_HOST", default=""):  # noqa: F405
         CONN_MAX_AGE=0,
         OPTIONS={"sslmode": "disable"},
     )
+
+# Pruebas: correos en memoria (mail.outbox) y envío en el mismo hilo para poder verificarlos.
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+NOTIFICACIONES_ASINCRONAS = False

@@ -325,20 +325,29 @@ IA_MATERIAL_MAX_PAGINAS = env.int("IA_MATERIAL_MAX_PAGINAS", default=30)  # pág
 IA_MATERIAL_MAX_CARACTERES = env.int("IA_MATERIAL_MAX_CARACTERES", default=15000)  # texto enviado a la IA
 
 # ---------------------------------------------------------------------------
-# Correo (por ahora imprime en consola; se conectará a un servicio más adelante)
+# Correo y notificaciones
 # ---------------------------------------------------------------------------
-EMAIL_BACKEND = env(
-    "EMAIL_BACKEND",
-    default="django.core.mail.backends.console.EmailBackend",
-)
-EMAIL_HOST = env("EMAIL_HOST", default="")
+# Desarrollo: los correos se imprimen en la consola. Producción/pruebas reales con Resend:
+#   EMAIL_BACKEND=apps.notifications.backends.ResendEmailBackend  y  RESEND_API_KEY=re_...
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+RESEND_API_KEY = env("RESEND_API_KEY", default="")
+RESEND_TIMEOUT_SEGUNDOS = env.int("RESEND_TIMEOUT_SEGUNDOS", default=15)
+# Sin dominio verificado en Resend solo se puede usar onboarding@resend.dev, y solo envía
+# al correo con el que creaste la cuenta de Resend.
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="EduGest <onboarding@resend.dev>")
+EMAIL_HOST = env("EMAIL_HOST", default="")  # solo si se usa SMTP en lugar de Resend
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-DEFAULT_FROM_EMAIL = env(
-    "DEFAULT_FROM_EMAIL", default="EduGest <no-reply@edugest.local>"
-)
+# Dirección del frontend: los botones de los correos llevan a ella.
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+# Envía los avisos en segundo plano para no retrasar la respuesta (los de seguridad, al momento).
+NOTIFICACIONES_ASINCRONAS = env.bool("NOTIFICACIONES_ASINCRONAS", default=True)
+# Recuperación de contraseña con código OTP.
+RECUPERACION_MINUTOS = env.int("RECUPERACION_MINUTOS", default=10)
+RECUPERACION_MAX_INTENTOS = env.int("RECUPERACION_MAX_INTENTOS", default=5)
+RECUPERACION_ESPERA_SEGUNDOS = env.int("RECUPERACION_ESPERA_SEGUNDOS", default=60)
 
 # ---------------------------------------------------------------------------
 # Logging

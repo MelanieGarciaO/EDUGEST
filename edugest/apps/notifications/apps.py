@@ -6,3 +6,6 @@ class NotificationsConfig(AppConfig):
     name = "apps.notifications"
     label = "notifications"
     verbose_name = "Notificaciones"
+
+    def ready(self):
+        from . import receivers  # noqa: F401  (suscribe los avisos a las señales de negocio)

@@ -1,0 +1,43 @@
+{% autoescape on %}<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ correo.asunto }}</title></head>
+<body style="margin:0;padding:0;background:#eef3f9;font-family:Arial,Helvetica,sans-serif;color:#1f2a44;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f9;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;">
+        <tr><td style="background:#17406f;padding:20px 28px;">
+          <span style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:.3px;">EduGest</span>
+          {% if institucion != "EduGest" %}<span style="color:#b9cde6;font-size:13px;"> · {{ institucion }}</span>{% endif %}
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <h1 style="margin:0 0 16px;font-size:20px;color:#17406f;">{{ correo.asunto }}</h1>
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Hola, {{ nombre }}:</p>
+          {% for p in correo.parrafos %}<p style="margin:0 0 14px;font-size:15px;line-height:1.55;">{{ p|linebreaksbr }}</p>{% endfor %}
+          {% if correo.destacado %}
+          <div style="margin:20px 0;padding:16px;background:#eef3f9;border-radius:10px;text-align:center;font-family:'Courier New',monospace;font-size:28px;font-weight:bold;letter-spacing:6px;color:#17406f;">{{ correo.destacado }}</div>
+          {% endif %}
+          {% if correo.detalles %}
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:6px 0 18px;border-collapse:collapse;">
+            {% for etiqueta, valor in correo.detalles %}
+            <tr>
+              <td style="padding:8px 10px;border-bottom:1px solid #e3e9f1;font-size:13px;color:#5b6b80;width:38%;vertical-align:top;">{{ etiqueta }}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid #e3e9f1;font-size:14px;vertical-align:top;">{{ valor|linebreaksbr }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% endif %}
+          {% if correo.boton %}
+          <p style="margin:22px 0;"><a href="{{ boton_url }}" style="display:inline-block;background:#1f6fd1;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:12px 22px;border-radius:10px;">{{ correo.boton.0 }}</a></p>
+          {% endif %}
+          {% if correo.nota %}<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#5b6b80;">{{ correo.nota }}</p>{% endif %}
+        </td></tr>
+        <tr><td style="padding:16px 28px 22px;border-top:1px solid #e3e9f1;font-size:12px;line-height:1.5;color:#7a8798;">
+          Este es un mensaje automático de EduGest; no respondas a este correo.<br>
+          Puedes elegir qué avisos recibir por correo en <a href="{{ url_preferencias }}" style="color:#1f6fd1;">Notificaciones</a>. Los avisos de seguridad de tu cuenta siempre se envían.
+        </td></tr>
+      </table>
+      <p style="font-size:11px;color:#9aa6b6;margin:14px 0 0;">© {{ anio }} {{ institucion }}</p>
+    </td></tr>
+  </table>
+</body>
+</html>{% endautoescape %}
