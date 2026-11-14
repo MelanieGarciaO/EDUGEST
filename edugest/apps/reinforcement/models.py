@@ -22,6 +22,21 @@ class EstrategiaRefuerzo(models.TextChoices):
     TAREA_CASA = "TAREA_CASA", "Tareas para la casa"
 
 
+class FaseErca(models.TextChoices):
+    """
+    Ciclo de aprendizaje ERCA (Minedec): cada actividad del plan pertenece a una fase y el
+    plan las presenta en este orden.
+    """
+
+    EXPERIENCIA = "EXPERIENCIA", "Experiencia"
+    REFLEXION = "REFLEXION", "Reflexión"
+    CONCEPTUALIZACION = "CONCEPTUALIZACION", "Conceptualización"
+    APLICACION = "APLICACION", "Aplicación"
+
+
+ORDEN_FASES = {fase: i for i, fase in enumerate(FaseErca.values)}
+
+
 class RecursoRefuerzo(models.Model):
     """
     Actividad del banco de recursos. Se clasifica por tema (o subtema) y nivel; el grado
@@ -39,6 +54,8 @@ class RecursoRefuerzo(models.Model):
         choices=EstrategiaRefuerzo.choices,
         default=EstrategiaRefuerzo.INDIVIDUAL,
     )
+    # Opcional en el banco: si está vacía, las reglas la asignan al armar el plan (erca.py).
+    fase = models.CharField("fase ERCA", max_length=20, choices=FaseErca.choices, blank=True)
     titulo = models.CharField("título", max_length=200)
     instrucciones = models.TextField("instrucciones")
     duracion_minutos = models.PositiveSmallIntegerField(
@@ -177,6 +194,18 @@ class TemaPlan(models.Model):
     )
     evaluado_en = models.DateTimeField(null=True, blank=True)
 
+    # --- Diseño Universal para el Aprendizaje (DUA): apoyos para este tema. Las reglas los
+    # prellenan al generar el plan (dua.py) y el docente puede editarlos en la propuesta.
+    class OrigenDua(models.TextChoices):
+        REGLAS = "REGLAS", "Reglas del sistema"
+        IA = "IA", "Sugerido con IA y revisado por el docente"
+        DOCENTE = "DOCENTE", "Escrito por el docente"
+
+    dua_implicacion = models.TextField("DUA: implicación (motivación)", blank=True)
+    dua_representacion = models.TextField("DUA: representación (cómo se presenta)", blank=True)
+    dua_accion_expresion = models.TextField("DUA: acción y expresión (cómo lo demuestra)", blank=True)
+    dua_origen = models.CharField(max_length=10, choices=OrigenDua.choices, default=OrigenDua.REGLAS)
+
     class Meta:
         verbose_name = "tema del plan"
         verbose_name_plural = "temas del plan"
@@ -198,6 +227,7 @@ class ActividadRefuerzo(models.Model):
     class Origen(models.TextChoices):
         BANCO = "BANCO", "Banco de recursos"
         MANUAL = "MANUAL", "Agregada por el docente"
+        ERCA = "ERCA", "Actividad guía del ciclo ERCA"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
@@ -213,6 +243,7 @@ class ActividadRefuerzo(models.Model):
     duracion_minutos = models.PositiveSmallIntegerField(null=True, blank=True)
     nivel = models.CharField(max_length=10, choices=NivelActividad.choices, blank=True)
     estrategia = models.CharField(max_length=15, choices=EstrategiaRefuerzo.choices, blank=True)
+    fase = models.CharField("fase ERCA", max_length=20, choices=FaseErca.choices, blank=True)
     orden = models.PositiveSmallIntegerField(default=0)
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True

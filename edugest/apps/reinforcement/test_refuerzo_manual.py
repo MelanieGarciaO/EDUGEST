@@ -33,8 +33,8 @@ class RefuerzoManualTests(RefuerzoBase):
         self.assertEqual(tema["promedio_inicial"], "8.50")
         self.assertIsNone(tema["dificultad_estado"])
         self.assertIn("Falla al comparar fracciones", tema["objetivo"])
-        # carga ligera: 1 básica + 2 intermedias
-        niveles = [a["nivel"] for a in tema["actividades"]]
+        # carga ligera: 1 básica + 2 intermedias (+ la actividad guía de Reflexión del ciclo ERCA)
+        niveles = [a["nivel"] for a in tema["actividades"] if a["origen"] != "ERCA"]
         self.assertEqual(niveles, ["BASICO", "INTERMEDIO", "INTERMEDIO"])
         self.assertEqual(res.data["nivel"], "REGULAR")
 

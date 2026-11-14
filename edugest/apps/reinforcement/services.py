@@ -11,8 +11,8 @@ from apps.academic import selectors as academic_selectors
 from apps.grades import scale
 from apps.grades.models import Calificacion, Dificultad
 
-from . import rules
-from .models import ActividadRefuerzo, PlanRefuerzo, RecursoRefuerzo, TemaPlan
+from . import dua, erca, rules
+from .models import ActividadRefuerzo, FaseErca, PlanRefuerzo, RecursoRefuerzo, TemaPlan
 from .signals import (
     actividad_refuerzo_cumplida,
     plan_aprobado,
@@ -148,18 +148,42 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
     )
 
     def crear_actividades(tema_plan, recursos):
-        for posicion, recurso in enumerate(recursos, start=1):
-            ActividadRefuerzo.objects.create(
-                tema_plan=tema_plan,
-                recurso=recurso,
-                origen=ActividadRefuerzo.Origen.BANCO,
-                titulo=recurso.titulo,
-                instrucciones=recurso.instrucciones,
-                duracion_minutos=recurso.duracion_minutos,
-                nivel=recurso.nivel,
-                estrategia=recurso.estrategia,
-                orden=posicion,
-            )
+        """Actividades del banco con su fase ERCA + actividades guía de las fases que falten."""
+        items = [(recurso, fase) for recurso, fase in erca.asignar_fases(recursos)]
+        items += [(None, fase) for fase in erca.fases_faltantes([f for _, f in items])]
+        for posicion, (recurso, fase) in enumerate(erca.ordenar(items, lambda x: x[1]), start=1):
+            if recurso is not None:
+                ActividadRefuerzo.objects.create(
+                    tema_plan=tema_plan,
+                    recurso=recurso,
+                    origen=ActividadRefuerzo.Origen.BANCO,
+                    titulo=recurso.titulo,
+                    instrucciones=recurso.instrucciones,
+                    duracion_minutos=recurso.duracion_minutos,
+                    nivel=recurso.nivel,
+                    estrategia=recurso.estrategia,
+                    fase=fase,
+                    orden=posicion,
+                )
+            else:
+                titulo, instrucciones = erca.guia(fase, tema_plan.tema.nombre, asignatura.nombre)
+                ActividadRefuerzo.objects.create(
+                    tema_plan=tema_plan,
+                    origen=ActividadRefuerzo.Origen.ERCA,
+                    titulo=titulo,
+                    instrucciones=instrucciones,
+                    duracion_minutos=erca.DURACION_GUIA,
+                    fase=fase,
+                    orden=posicion,
+                )
+
+    def apoyos_dua(tema, nivel, reincidente=False, motivo=""):
+        d = dua.sugerir(asignatura.nombre, tema.nombre, nivel, reincidente, motivo)
+        return {
+            "dua_implicacion": d["implicacion"],
+            "dua_representacion": d["representacion"],
+            "dua_accion_expresion": d["accion_expresion"],
+        }
 
     orden = 0
     for tema, motivo in manuales:
@@ -179,6 +203,7 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
             promedio_inicial=scale.promedio(valores),
             nivel_dificultad=rules.NIVEL_MANUAL,
             sin_recursos=not recursos,
+            **apoyos_dua(tema, rules.NIVEL_MANUAL, motivo=motivo),
         )
         crear_actividades(tema_plan, recursos)
 
@@ -194,6 +219,7 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
             promedio_inicial=dificultad.promedio,
             nivel_dificultad=dificultad.nivel,
             sin_recursos=not recursos,
+            **apoyos_dua(dificultad.tema, dificultad.nivel, reincidente=dificultad.reincidente),
         )
         crear_actividades(tema_plan, recursos)
     return plan
@@ -204,7 +230,7 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
 # ---------------------------------------------------------------------------
 @transaction.atomic
 def agregar_actividad(
-    tema_plan, *, recurso=None, titulo=None, instrucciones=None, duracion_minutos=None, estrategia=""
+    tema_plan, *, recurso=None, titulo=None, instrucciones=None, duracion_minutos=None, estrategia="", fase=""
 ):
     plan = tema_plan.plan
     verificar_editable(plan)
@@ -235,6 +261,7 @@ def agregar_actividad(
             duracion_minutos=recurso.duracion_minutos,
             nivel=recurso.nivel,
             estrategia=recurso.estrategia,
+            fase=fase or recurso.fase or erca.fase_por_nivel(recurso.nivel),
             orden=siguiente,
         )
 
@@ -245,6 +272,7 @@ def agregar_actividad(
         instrucciones=instrucciones,
         duracion_minutos=duracion_minutos,
         estrategia=estrategia or "",
+        fase=fase or FaseErca.APLICACION,
         orden=siguiente,
     )
 

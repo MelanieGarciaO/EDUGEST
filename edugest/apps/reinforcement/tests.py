@@ -138,7 +138,8 @@ class RefuerzoBase(APITestCase):
 
     @staticmethod
     def titulos(tema_plan):
-        return [a["titulo"] for a in tema_plan["actividades"]]
+        """Títulos de las actividades del banco (sin las actividades guía del ciclo ERCA)."""
+        return [a["titulo"] for a in tema_plan["actividades"] if a["origen"] != "ERCA"]
 
     @staticmethod
     def ids(response):
@@ -165,7 +166,8 @@ class GenerarPlanTests(RefuerzoBase):
 
         self.assertEqual(
             plan["avance"],
-            {"actividades_total": 6, "actividades_cumplidas": 0, "porcentaje": 0, "temas_total": 2, "temas_superados": 0},
+            # 4 + guía de Reflexión en Fracciones; 2 + guías de Reflexión y Conceptualización en Decimales.
+            {"actividades_total": 9, "actividades_cumplidas": 0, "porcentaje": 0, "temas_total": 2, "temas_superados": 0},
         )
 
     def test_las_actividades_copian_el_contenido_del_recurso(self):
@@ -199,7 +201,10 @@ class GenerarPlanTests(RefuerzoBase):
         plan = self.plan_con({self.proporcion: "5.0"})
         tema = plan["temas"][0]
         self.assertTrue(tema["sin_recursos"])
-        self.assertEqual(tema["actividades"], [])
+        # Sin recursos en el banco, el tema recibe las 4 actividades guía del ciclo ERCA.
+        self.assertEqual([(a["origen"], a["fase"]) for a in tema["actividades"]], [
+            ("ERCA", "EXPERIENCIA"), ("ERCA", "REFLEXION"), ("ERCA", "CONCEPTUALIZACION"), ("ERCA", "APLICACION"),
+        ])
 
     def test_un_subtema_sin_recursos_usa_los_de_su_tema_padre(self):
         plan = self.plan_con({self.equivalentes: "5.0"})
@@ -295,7 +300,8 @@ class EdicionTests(RefuerzoBase):
         res = self.post(self.url_agregar, {"titulo": "Repasar en casa", "instrucciones": "Resolver la página 30", "duracion_minutos": 20})
         self.assertEqual(res.status_code, 201)
         self.assertEqual((res.data["origen"], res.data["recurso"], res.data["nivel"]), ("MANUAL", None, ""))
-        self.assertEqual(res.data["orden"], 5)
+        self.assertEqual(res.data["orden"], 6)  # 4 del banco + la guía de Reflexión
+        self.assertEqual(res.data["fase"], "APLICACION")  # fase por defecto de una actividad propia
 
     def test_actividad_propia_incompleta(self):
         self.assertEqual(self.post(self.url_agregar, {"titulo": "Solo título"}).status_code, 400)
@@ -316,7 +322,7 @@ class EdicionTests(RefuerzoBase):
         self.assertEqual(res.status_code, 201)
 
     def test_maximo_de_actividades_por_tema(self):
-        for i in range(6):   # ya tiene 4 -> llega a 10
+        for i in range(5):   # ya tiene 5 (4 del banco + guía de Reflexión) -> llega a 10
             self.assertEqual(self.post(self.url_agregar, {"titulo": f"Extra {i}", "instrucciones": "x"}).status_code, 201)
         res = self.post(self.url_agregar, {"titulo": "Una más", "instrucciones": "x"})
         self.assertEqual(res.status_code, 400)
@@ -510,7 +516,7 @@ class SeguimientoTests(RefuerzoBase):
         avance = self.client.get(reverse("plan-detail", args=[self.plan["id"]])).data["avance"]
         self.assertEqual(
             avance,
-            {"actividades_total": 4, "actividades_cumplidas": 1, "porcentaje": 25, "temas_total": 1, "temas_superados": 1},
+            {"actividades_total": 5, "actividades_cumplidas": 1, "porcentaje": 20, "temas_total": 1, "temas_superados": 1},
         )
 
 

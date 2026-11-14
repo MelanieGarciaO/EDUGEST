@@ -10,6 +10,7 @@ from .models import (
     ActividadRefuerzo,
     EstrategiaRefuerzo,
     EvidenciaActividad,
+    FaseErca,
     NivelActividad,
     PlanRefuerzo,
     RecursoRefuerzo,
@@ -47,6 +48,7 @@ class ActividadRefuerzoSerializer(serializers.ModelSerializer):
             "duracion_minutos",
             "nivel",
             "estrategia",
+            "fase",
             "orden",
             "estado",
             "cumplida_en",
@@ -91,6 +93,10 @@ class TemaPlanSerializer(serializers.ModelSerializer):
             "dificultad_estado",
             "dificultad_reincidente",
             "sin_recursos",
+            "dua_implicacion",
+            "dua_representacion",
+            "dua_accion_expresion",
+            "dua_origen",
             "actividades",
             "nota_evaluacion",
             "evaluacion_actividad",
@@ -224,18 +230,49 @@ class GenerarPlanSerializer(serializers.Serializer):
     temas_manuales = TemaManualSerializer(many=True, required=False)
 
 
+MAX_DUA = 800
+
+
 class TemaPlanEditarSerializer(serializers.ModelSerializer):
-    objetivo = serializers.CharField(max_length=500)
+    """Objetivo y apoyos DUA del tema. Editar el DUA sin indicar origen lo marca como del docente."""
+
+    objetivo = serializers.CharField(max_length=500, required=False)
+    dua_implicacion = serializers.CharField(max_length=MAX_DUA, required=False)
+    dua_representacion = serializers.CharField(max_length=MAX_DUA, required=False)
+    dua_accion_expresion = serializers.CharField(max_length=MAX_DUA, required=False)
+    dua_origen = serializers.ChoiceField(
+        choices=[TemaPlan.OrigenDua.IA, TemaPlan.OrigenDua.DOCENTE], required=False
+    )
 
     class Meta:
         model = TemaPlan
-        fields = ("objetivo",)
+        fields = ("objetivo", "dua_implicacion", "dua_representacion", "dua_accion_expresion", "dua_origen")
 
     def validate_objetivo(self, value):
         value = " ".join(value.split())
         if not value:
             raise serializers.ValidationError("El objetivo no puede estar vacío.")
         return value
+
+    def _dua(self, value):
+        value = "\n".join(" ".join(linea.split()) for linea in value.strip().splitlines()).strip()
+        if len(value) < 10:
+            raise serializers.ValidationError("Escribe al menos una indicación (10 caracteres o más).")
+        return value
+
+    validate_dua_implicacion = _dua
+    validate_dua_representacion = _dua
+    validate_dua_accion_expresion = _dua
+
+    def validate(self, attrs):
+        cambia_dua = any(k.startswith("dua_") and k != "dua_origen" for k in attrs)
+        if cambia_dua:
+            attrs.setdefault("dua_origen", TemaPlan.OrigenDua.DOCENTE)
+        else:
+            attrs.pop("dua_origen", None)
+        if not attrs:
+            raise serializers.ValidationError("No hay cambios para guardar.")
+        return attrs
 
 
 class AgregarActividadSerializer(serializers.Serializer):
@@ -254,6 +291,7 @@ class AgregarActividadSerializer(serializers.Serializer):
     estrategia = serializers.ChoiceField(
         choices=EstrategiaRefuerzo.choices, required=False, allow_blank=True
     )
+    fase = serializers.ChoiceField(choices=FaseErca.choices, required=False, allow_blank=True)
 
     def validate(self, attrs):
         if "recurso" not in attrs:
@@ -275,9 +313,11 @@ class ActividadRefuerzoEditarSerializer(serializers.ModelSerializer):
         min_value=1, max_value=240, required=False, allow_null=True
     )
 
+    fase = serializers.ChoiceField(choices=FaseErca.choices, required=False)
+
     class Meta:
         model = ActividadRefuerzo
-        fields = ("titulo", "instrucciones", "duracion_minutos", "estrategia")
+        fields = ("titulo", "instrucciones", "duracion_minutos", "estrategia", "fase")
 
     def validate_titulo(self, value):
         value = " ".join(value.split())
@@ -316,6 +356,7 @@ class RecursoSerializer(serializers.ModelSerializer):
             "grado_nombre",
             "nivel",
             "estrategia",
+            "fase",
             "titulo",
             "instrucciones",
             "duracion_minutos",
