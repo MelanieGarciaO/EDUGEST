@@ -76,7 +76,7 @@ export default function RepresentantePlanDetalle() {
                             </Button>
                         </Card>
                     ) : null}
-                    <PlanTemas plan={plan} actions={acciones} evidencias="subir" />
+                    <PlanTemas plan={plan} actions={acciones} familia evidencias="subir" />
                 </div>
             )}
 

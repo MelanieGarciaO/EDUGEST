@@ -21,7 +21,7 @@ import {
     Spinner,
     TextAreaField,
 } from '../components/ui'
-import { ESTRATEGIA_LABEL, ESTRATEGIAS, NIVEL_LABEL, NIVEL_TONE, NIVELES, temaLabel } from '../lib/format'
+import { ESTRATEGIA_LABEL, ESTRATEGIAS, FASE_LABEL, FASES_ERCA, NIVEL_LABEL, NIVEL_TONE, NIVELES, temaLabel } from '../lib/format'
 import { useDebouncedValue } from '../lib/hooks'
 import { useAsignaturasActivas, useGrados, useTemasActivos } from '../lib/queries'
 
@@ -35,6 +35,7 @@ function RecursoForm({ item, temas, onClose }) {
         tema: item?.tema ?? '',
         nivel: item?.nivel ?? '',
         estrategia: item?.estrategia ?? 'INDIVIDUAL',
+        fase: item?.fase ?? '',
         titulo: item?.titulo ?? '',
         instrucciones: item?.instrucciones ?? '',
         duracion_minutos: item?.duracion_minutos ?? '',
@@ -75,6 +76,7 @@ function RecursoForm({ item, temas, onClose }) {
         const payload = {
             nivel: values.nivel,
             estrategia: values.estrategia,
+            fase: values.fase,
             titulo: values.titulo.trim(),
             instrucciones: values.instrucciones.trim(),
             duracion_minutos: minutos,
@@ -141,6 +143,12 @@ function RecursoForm({ item, temas, onClose }) {
                         <option key={e.value} value={e.value}>
                             {e.label}
                         </option>
+                    ))}
+                </SelectField>
+                <SelectField label="Fase del ciclo ERCA" value={values.fase} onChange={set('fase')} error={errors.fase} hint="Si la dejas en automático, el sistema la asigna al armar el plan.">
+                    <option value="">Automática (según el nivel)</option>
+                    {FASES_ERCA.map((f) => (
+                        <option key={f.value} value={f.value}>{`${f.letra} · ${f.label}`}</option>
                     ))}
                 </SelectField>
                 <Field label="Título" value={values.titulo} onChange={set('titulo')} error={errors.titulo} maxLength={200} />
@@ -310,6 +318,7 @@ export default function Recursos() {
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Chip tone={NIVEL_TONE[r.nivel]}>{NIVEL_LABEL[r.nivel]}</Chip>
                                         <Chip>{ESTRATEGIA_LABEL[r.estrategia]}</Chip>
+                                        {r.fase && <Chip tone="ok">{`ERCA · ${FASE_LABEL[r.fase]}`}</Chip>}
                                         {r.generado_ia && <Chip tone="warn">Generado con IA</Chip>}
                                         {!r.is_active && <Chip tone="danger">Inactivo</Chip>}
                                     </div>

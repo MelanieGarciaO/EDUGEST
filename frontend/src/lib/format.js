@@ -69,6 +69,23 @@ export const ESTRATEGIAS = [
 ]
 export const ESTRATEGIA_LABEL = Object.fromEntries(ESTRATEGIAS.map((e) => [e.value, e.label]))
 
+/** Ciclo de aprendizaje ERCA (Minedec): orden en que se presentan las actividades del plan. */
+export const FASES_ERCA = [
+    { value: 'EXPERIENCIA', label: 'Experiencia', letra: 'E', descripcion: 'Parte de algo que el estudiante ya vive o conoce.' },
+    { value: 'REFLEXION', label: 'Reflexión', letra: 'R', descripcion: 'Piensa sobre lo que hizo: qué entendió y dónde se equivocó.' },
+    { value: 'CONCEPTUALIZACION', label: 'Conceptualización', letra: 'C', descripcion: 'Aprende o repasa el concepto y sus pasos.' },
+    { value: 'APLICACION', label: 'Aplicación', letra: 'A', descripcion: 'Practica y usa lo aprendido en situaciones nuevas.' },
+]
+export const FASE_LABEL = Object.fromEntries(FASES_ERCA.map((f) => [f.value, f.label]))
+
+/** Principios del Diseño Universal para el Aprendizaje (DUA) de cada tema del plan. */
+export const PRINCIPIOS_DUA = [
+    { campo: 'dua_implicacion', titulo: 'Implicación', familia: 'Para motivarlo', pregunta: '¿Cómo motivarlo y mantener su interés?' },
+    { campo: 'dua_representacion', titulo: 'Representación', familia: 'Para explicarle', pregunta: '¿Cómo presentarle el contenido?' },
+    { campo: 'dua_accion_expresion', titulo: 'Acción y expresión', familia: 'Para que demuestre lo aprendido', pregunta: '¿Cómo puede demostrar lo que aprendió?' },
+]
+export const DUA_ORIGEN_LABEL = { REGLAS: 'Sugerido por el sistema', IA: 'Sugerido con IA y revisado', DOCENTE: 'Escrito por el docente' }
+
 /** Evaluación de refuerzo de un plan completado. */
 export function evaluacionPlan(ev) {
     if (!ev) return null

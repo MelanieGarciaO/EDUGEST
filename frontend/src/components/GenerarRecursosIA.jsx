@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, FileText, Lightbulb, Paperclip, RotateCcw, Sparkles, X } from 'lucide-react'
 
 import { api, parseApiError } from '../api/client'
-import { ESTRATEGIAS, NIVELES, temaLabel } from '../lib/format'
+import { ESTRATEGIAS, FASES_ERCA, NIVELES, temaLabel } from '../lib/format'
 import { Alert, Button, Chip, Field, Modal, SelectField, TextAreaField } from './ui'
 
 const ENDPOINT = '/reinforcement/recursos/'
@@ -108,6 +108,12 @@ function Propuesta({ p, onChange }) {
             </div>
             <fieldset disabled={p.guardado} className="space-y-3">
                 <Field label="Título" value={p.titulo} onChange={set('titulo')} maxLength={200} error={p.errores?.titulo} />
+                <SelectField label="Fase del ciclo ERCA" value={p.fase ?? ''} onChange={set('fase')} error={p.errores?.fase}>
+                    <option value="">Automática (según el nivel)</option>
+                    {FASES_ERCA.map((f) => (
+                        <option key={f.value} value={f.value}>{`${f.letra} · ${f.label}`}</option>
+                    ))}
+                </SelectField>
                 <div className="grid gap-3 sm:grid-cols-[1fr_9rem]">
                     <SelectField label="Estrategia" value={p.estrategia} onChange={set('estrategia')} error={p.errores?.estrategia}>
                         {ESTRATEGIAS.map((e) => (
@@ -195,6 +201,7 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
                     tema: p.tema,
                     nivel: p.nivel,
                     estrategia: p.estrategia,
+                    fase: p.fase ?? '',
                     titulo: p.titulo.trim(),
                     instrucciones: p.instrucciones.trim(),
                     duracion_minutos: p.duracion_minutos === '' ? null : Number(p.duracion_minutos),
