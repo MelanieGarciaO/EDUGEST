@@ -1,6 +1,6 @@
-import { CheckCircle2, Circle, Clock } from 'lucide-react'
+import { CheckCircle2, Circle, Clock, HeartHandshake } from 'lucide-react'
 
-import { ESTRATEGIA_LABEL, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
+import { DUA_ORIGEN_LABEL, ESTRATEGIA_LABEL, FASES_ERCA, PRINCIPIOS_DUA, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
 import { Card, Chip, cx } from './ui'
 import Evidencias from './Evidencias'
 
@@ -95,11 +95,59 @@ function TemaEvaluacion({ tema: t }) {
     )
 }
 
+/** Apoyos DUA del tema. Para la familia se presentan como «Cómo apoyar en casa». */
+function ApoyosDua({ tema: t, familia, acciones }) {
+    const hay = PRINCIPIOS_DUA.some((p) => t[p.campo])
+    if (!hay && !acciones) return null
+    return (
+        <section className="mt-4 rounded-xl border border-brand-100 bg-brand-50/60 p-4" aria-label={familia ? 'Cómo apoyar en casa' : 'Apoyos DUA'}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="flex items-center gap-1.5 font-extrabold text-navy-800">
+                    <HeartHandshake className="size-4 text-brand-700" aria-hidden="true" />
+                    {familia ? 'Cómo apoyar en casa' : 'Apoyos DUA'}
+                </h4>
+                {!familia && t.dua_origen && <span className="text-xs text-ink-500">{DUA_ORIGEN_LABEL[t.dua_origen]}</span>}
+            </div>
+            {hay ? (
+                <dl className="mt-2 grid gap-3 sm:grid-cols-3">
+                    {PRINCIPIOS_DUA.map((p) => (
+                        <div key={p.campo}>
+                            <dt className="text-xs font-bold uppercase tracking-wide text-brand-700">{familia ? p.familia : p.titulo}</dt>
+                            <dd className="mt-0.5 whitespace-pre-line text-sm text-ink-700">{t[p.campo] || '—'}</dd>
+                        </div>
+                    ))}
+                </dl>
+            ) : (
+                <p className="mt-2 text-sm text-ink-500">Este tema aún no tiene apoyos DUA.</p>
+            )}
+            {acciones && <div className="mt-3 flex flex-wrap gap-2">{acciones}</div>}
+        </section>
+    )
+}
+
+/** Agrupa las actividades por fase ERCA, en el orden del ciclo. */
+function porFase(actividades) {
+    const grupos = FASES_ERCA.map((f) => ({ ...f, actividades: actividades.filter((a) => a.fase === f.value) }))
+    const sinFase = actividades.filter((a) => !FASES_ERCA.some((f) => f.value === a.fase))
+    if (sinFase.length) grupos.push({ value: '', label: 'Sin fase', letra: '·', descripcion: '', actividades: sinFase })
+    return grupos.filter((g) => g.actividades.length)
+}
+
+const COLOR_FASE = {
+    EXPERIENCIA: 'bg-ok-50 text-ok-600',
+    REFLEXION: 'bg-warn-50 text-warn-600',
+    CONCEPTUALIZACION: 'bg-brand-100 text-brand-700',
+    APLICACION: 'bg-navy-800 text-white',
+    '': 'bg-brand-50 text-ink-500',
+}
+
 /**
- * Temas del plan con su objetivo y actividades. `actions(actividad, plan)` agrega botones por actividad,
- * `temaActions(tema, plan)` botones del tema y `evidencias` ('ver' | 'subir') muestra las fotos de evidencia.
+ * Temas del plan con su objetivo, apoyos DUA y actividades agrupadas por fase ERCA.
+ * `actions(actividad, plan)` agrega botones por actividad, `temaActions(tema, plan)` botones del tema,
+ * `duaActions(tema, plan)` botones del bloque DUA, `familia` muestra el DUA como «Cómo apoyar en casa»
+ * y `evidencias` ('ver' | 'subir') muestra las fotos de evidencia.
  */
-export function PlanTemas({ plan, actions, temaActions, evidencias }) {
+export function PlanTemas({ plan, actions, temaActions, duaActions, familia = false, evidencias }) {
     return (
         <div className="space-y-5">
             {plan.temas.map((t) => {
@@ -134,6 +182,12 @@ export function PlanTemas({ plan, actions, temaActions, evidencias }) {
                             <span className="font-bold">Objetivo: </span>
                             {t.objetivo}
                         </p>
+                        <ApoyosDua tema={t} familia={familia} acciones={duaActions?.(t, plan)} />
+                        {!familia && t.sin_recursos && t.actividades.length > 0 && (
+                            <p className="mt-3 rounded-xl bg-warn-50 px-4 py-3 text-sm font-semibold text-warn-600">
+                                El banco no tenía actividades para este tema: se agregaron actividades guía del ciclo ERCA. Puedes reemplazarlas por recursos del banco o propias.
+                            </p>
+                        )}
 
                         {t.actividades.length === 0 ? (
                             <p className="mt-3 rounded-xl bg-warn-50 px-4 py-3 text-sm font-semibold text-warn-600">
@@ -142,8 +196,18 @@ export function PlanTemas({ plan, actions, temaActions, evidencias }) {
                                     : 'Este tema no tiene actividades.'}
                             </p>
                         ) : (
-                            <ol className="mt-3 divide-y divide-line border-t border-line">
-                                {t.actividades.map((a) => {
+                            <div className="mt-4 space-y-4">
+                                {porFase(t.actividades).map((g) => (
+                                <section key={g.value || 'sin-fase'} aria-label={`Fase ${g.label}`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className={cx('grid size-7 shrink-0 place-items-center rounded-full text-sm font-extrabold', COLOR_FASE[g.value])} aria-hidden="true">
+                                            {g.letra}
+                                        </span>
+                                        <h4 className="font-extrabold text-navy-800">{g.label}</h4>
+                                        {g.descripcion && <span className="hidden text-xs text-ink-500 sm:inline">· {g.descripcion}</span>}
+                                    </div>
+                            <ol className="mt-1 divide-y divide-line">
+                                {g.actividades.map((a) => {
                                     const cumplida = a.estado === 'CUMPLIDA'
                                     const acciones = actions?.(a, plan)
                                     return (
@@ -160,6 +224,7 @@ export function PlanTemas({ plan, actions, temaActions, evidencias }) {
                                                         {a.nivel && <Chip tone={NIVEL_TONE[a.nivel]}>{NIVEL_LABEL[a.nivel]}</Chip>}
                                                         {a.estrategia && <Chip>{ESTRATEGIA_LABEL[a.estrategia]}</Chip>}
                                                         {a.origen === 'MANUAL' && <Chip>Agregada por el docente</Chip>}
+                                                        {a.origen === 'ERCA' && <Chip tone="warn">Actividad guía</Chip>}
                                                         {a.duracion_minutos && (
                                                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-500">
                                                                 <Clock className="size-3.5" aria-hidden="true" />
@@ -182,6 +247,9 @@ export function PlanTemas({ plan, actions, temaActions, evidencias }) {
                                     )
                                 })}
                             </ol>
+                                </section>
+                                ))}
+                            </div>
                         )}
                         <TemaEvaluacion tema={t} />
                         {extra && <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">{extra}</div>}

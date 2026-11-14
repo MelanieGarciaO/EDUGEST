@@ -227,6 +227,11 @@ def planes(user, f):
          ("Estado", 1.2), ("Actividades", 1.2), ("Avance %", 1), ("Temas superados", 1.3),
          ("Revisado por familia", 1.4), ("Creado", 1.2)],
     )
+    apoyos = Seccion(
+        "Apoyos DUA por tema",
+        [("Estudiante", 2.2), ("Asignatura", 1.6), ("Tema", 2), ("Implicación", 3.2),
+         ("Representación", 3.2), ("Acción y expresión", 3.2), ("Origen", 1.3)],
+    )
     temas = Seccion(
         "Resultado por tema",
         [("Estudiante", 2.6), ("Asignatura", 2), ("Tema", 3), ("Dificultad", 1.2),
@@ -246,7 +251,11 @@ def planes(user, f):
                 t.promedio_inicial if t.promedio_inicial is not None else "",
                 t.promedio_final if t.promedio_final is not None else "", superado,
             ])
-    return [_limitar(general), _limitar(temas)]
+            apoyos.filas.append([
+                p.estudiante.full_name, p.asignatura.nombre, str(t.tema), t.dua_implicacion,
+                t.dua_representacion, t.dua_accion_expresion, t.get_dua_origen_display(),
+            ])
+    return [_limitar(general), _limitar(temas), _limitar(apoyos)]
 
 
 def avance(user, f):
@@ -294,7 +303,7 @@ def avance(user, f):
     )
     s_pend = Seccion(
         "Actividades de refuerzo pendientes",
-        [("Asignatura", 2), ("Tema", 2.5), ("Actividad", 4), ("Duración (min)", 1.2)],
+        [("Asignatura", 2), ("Tema", 2.5), ("Fase ERCA", 1.6), ("Actividad", 4), ("Duración (min)", 1.2)],
         vacio="No tiene actividades de refuerzo pendientes.",
     )
     planes_ = refuerzo.planes_visibles(user).filter(estudiante=est)
@@ -308,7 +317,9 @@ def avance(user, f):
             for t in p.temas.all():
                 for a in t.actividades.all():
                     if a.estado == ActividadRefuerzo.Estado.PENDIENTE:
-                        s_pend.filas.append([p.asignatura.nombre, str(t.tema), a.titulo, a.duracion_minutos or ""])
+                        s_pend.filas.append([
+                            p.asignatura.nombre, str(t.tema), a.get_fase_display(), a.titulo, a.duracion_minutos or "",
+                        ])
     return [s_asig, s_tema, s_dif, s_planes, s_pend]
 
 

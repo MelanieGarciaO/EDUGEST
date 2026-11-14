@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Ban, CheckCircle2, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCircle2, Pencil, Plus, RotateCcw, Send, Sparkles, Trash2 } from 'lucide-react'
 
 import { api, fetchAll, parseApiError } from '../../api/client'
 import { PlanHeader, PlanTemas } from '../../components/PlanView'
 import { Alert, Button, ConfirmDialog, Field, Modal, PageHeader, SelectField, Spinner, TextAreaField } from '../../components/ui'
-import { ESTRATEGIAS, NIVEL_LABEL } from '../../lib/format'
+import { ESTRATEGIAS, FASES_ERCA, NIVEL_LABEL, PRINCIPIOS_DUA } from '../../lib/format'
 import { usePlan } from '../../lib/queries'
 
 /** Ejecuta un POST/PATCH/DELETE sobre el plan y refresca sus datos. */
@@ -57,16 +57,16 @@ function ObjetivoModal({ tema, planId, onClose }) {
 /** Edita una actividad existente (actividad) o agrega una propia (tema). */
 function ActividadModal({ actividad, tema, planId, onClose }) {
     const abierto = !!(actividad || tema)
-    const [f, setF] = useState({ titulo: '', instrucciones: '', duracion: '', estrategia: '' })
+    const [f, setF] = useState({ titulo: '', instrucciones: '', duracion: '', estrategia: '', fase: 'APLICACION' })
     const guardar = useAccion(planId, async () => {
-        const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia }
+        const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia, fase: f.fase }
         return actividad
             ? (await api.patch(`/reinforcement/actividades/${actividad.id}/`, body)).data
             : (await api.post(`/reinforcement/temas-plan/${tema.id}/actividades/`, body)).data
     })
     useEffect(() => {
         if (abierto) {
-            setF({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '' })
+            setF({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION' })
             guardar.reset()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,6 +89,11 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
         >
             <div className="space-y-4">
                 {err && !Object.keys(err.fields).length && <Alert>{err.message}</Alert>}
+                <SelectField label="Fase del ciclo ERCA" value={f.fase} onChange={set('fase')} error={err?.fields.fase} hint={FASES_ERCA.find((x) => x.value === f.fase)?.descripcion}>
+                    {FASES_ERCA.map((x) => (
+                        <option key={x.value} value={x.value}>{`${x.letra} · ${x.label}`}</option>
+                    ))}
+                </SelectField>
                 <Field label="Título" maxLength={200} value={f.titulo} onChange={set('titulo')} error={err?.fields.titulo} />
                 <TextAreaField label="Instrucciones" rows={5} maxLength={2000} value={f.instrucciones} onChange={set('instrucciones')} error={err?.fields.instrucciones} />
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -100,6 +105,74 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
                     </SelectField>
                     <Field label="Duración (min)" type="number" min="1" max="240" value={f.duracion} onChange={set('duracion')} error={err?.fields.duracion_minutos} hint="Opcional." />
                 </div>
+            </div>
+        </Modal>
+    )
+}
+
+/** Edita los apoyos DUA del tema; puede pedir una sugerencia a la IA y revisarla antes de guardar. */
+function DuaModal({ tema, planId, iaDisponible, onClose }) {
+    // Se monta de nuevo para cada tema (key), así el formulario arranca con sus valores.
+    const [f, setF] = useState(() => Object.fromEntries(PRINCIPIOS_DUA.map((p) => [p.campo, tema?.[p.campo] ?? ''])))
+    const [desdeIA, setDesdeIA] = useState(false)
+    const guardar = useAccion(planId, async () => {
+        const body = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()]))
+        if (desdeIA) body.dua_origen = 'IA'
+        return (await api.patch(`/reinforcement/temas-plan/${tema.id}/`, body)).data
+    })
+    const sugerir = useMutation({
+        mutationFn: async () => (await api.post(`/reinforcement/temas-plan/${tema.id}/sugerir-dua/`, {}, { timeout: 180_000 })).data,
+        onSuccess: (data) => {
+            setF({ dua_implicacion: data.dua.implicacion, dua_representacion: data.dua.representacion, dua_accion_expresion: data.dua.accion_expresion })
+            setDesdeIA(true)
+        },
+    })
+    const err = mensaje(guardar)
+    const errIA = sugerir.isError ? (sugerir.error?.response?.data?.detail ?? parseApiError(sugerir.error).message) : ''
+    const completo = PRINCIPIOS_DUA.every((p) => f[p.campo].trim().length >= 10)
+
+    return (
+        <Modal
+            open={!!tema}
+            onClose={onClose}
+            size="lg"
+            title={tema ? `Apoyos DUA de «${tema.tema_nombre}»` : ''}
+            footer={
+                <>
+                    <Button variant="secondary" onClick={onClose} disabled={guardar.isPending || sugerir.isPending}>Cancelar</Button>
+                    <Button loading={guardar.isPending} disabled={!completo || sugerir.isPending} onClick={() => guardar.mutate(undefined, { onSuccess: onClose })}>
+                        Guardar apoyos
+                    </Button>
+                </>
+            }
+        >
+            <div className="space-y-4">
+                <p className="text-sm text-ink-500">
+                    Diseño Universal para el Aprendizaje: cómo motivar al estudiante, cómo presentarle el tema y cómo puede demostrar lo aprendido. La familia lo verá como «Cómo apoyar en casa».
+                </p>
+                {iaDisponible && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="secondary" onClick={() => sugerir.mutate()} loading={sugerir.isPending} disabled={guardar.isPending}>
+                            <Sparkles className="size-4" aria-hidden="true" />
+                            {sugerir.isPending ? 'Generando… (puede tardar hasta 2 min)' : 'Sugerir con IA'}
+                        </Button>
+                        <span className="text-xs text-ink-500">Solo se envían la asignatura, el grado, el tema y sus actividades; nunca datos del estudiante.</span>
+                    </div>
+                )}
+                {errIA && <Alert>{errIA}</Alert>}
+                {desdeIA && <Alert tone="warn">Sugerencia generada con IA: revísala y ajústala antes de guardarla.</Alert>}
+                {err && !Object.keys(err.fields).length && <Alert>{err.message}</Alert>}
+                {PRINCIPIOS_DUA.map((p) => (
+                    <TextAreaField
+                        key={p.campo}
+                        label={`${p.titulo} — ${p.pregunta}`}
+                        rows={3}
+                        maxLength={800}
+                        value={f[p.campo]}
+                        onChange={(e) => setF((x) => ({ ...x, [p.campo]: e.target.value }))}
+                        error={err?.fields[p.campo]}
+                    />
+                ))}
             </div>
         </Modal>
     )
@@ -168,6 +241,12 @@ export default function PlanDetalle() {
     const { data: plan, isLoading, isError } = usePlan(id)
 
     const [objetivoDe, setObjetivoDe] = useState(null)
+    const [duaDe, setDuaDe] = useState(null)
+    const iaConfig = useQuery({
+        queryKey: ['recursos', 'ia-config'],
+        queryFn: async () => (await api.get('/reinforcement/recursos/ia/')).data,
+        staleTime: 5 * 60_000,
+    })
     const [editando, setEditando] = useState(null)
     const [propiaEn, setPropiaEn] = useState(null)
     const [bancoEn, setBancoEn] = useState(null)
@@ -210,6 +289,14 @@ export default function PlanDetalle() {
             </Button>
         )
     }
+
+    const accionesDua = (t) =>
+        propuesta ? (
+            <Button variant="secondary" className="min-h-9 px-3 text-sm" onClick={() => setDuaDe(t)} aria-label={`Editar apoyos DUA de ${t.tema_nombre}`}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Editar apoyos DUA
+            </Button>
+        ) : null
 
     const accionesTema = (t) =>
         propuesta ? (
@@ -261,11 +348,12 @@ export default function PlanDetalle() {
                     )}
                     {errSeg && <Alert>{errSeg.message}</Alert>}
                     <PlanHeader plan={plan} docente />
-                    <PlanTemas plan={plan} actions={accionesActividad} temaActions={accionesTema} evidencias="ver" />
+                    <PlanTemas plan={plan} actions={accionesActividad} temaActions={accionesTema} duaActions={accionesDua} evidencias="ver" />
                 </div>
             )}
 
             <ObjetivoModal tema={objetivoDe} planId={id} onClose={() => setObjetivoDe(null)} />
+            <DuaModal key={duaDe?.id ?? 'cerrado'} tema={duaDe} planId={id} iaDisponible={Boolean(iaConfig.data?.disponible)} onClose={() => setDuaDe(null)} />
             <ActividadModal actividad={editando} tema={propiaEn} planId={id} onClose={() => { setEditando(null); setPropiaEn(null) }} />
             {plan && <BancoModal tema={bancoEn} plan={plan} onClose={() => setBancoEn(null)} />}
 

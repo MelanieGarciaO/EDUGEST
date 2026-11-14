@@ -216,7 +216,8 @@ class PlanViewSet(viewsets.ReadOnlyModelViewSet):
 class TemaPlanViewSet(viewsets.GenericViewSet):
     """
     Edición de un tema del plan (solo docente, solo mientras el plan es una propuesta).
-      PATCH /{id}/               {"objetivo": "..."}
+      PATCH /{id}/               {"objetivo": "...", "dua_implicacion": "...", ...}
+      POST  /{id}/sugerir-dua/   propuesta de apoyos DUA con IA (no guarda)
       POST  /{id}/actividades/   {"recurso": id}  o  {"titulo": "...", "instrucciones": "..."}
     """
 
@@ -233,6 +234,13 @@ class TemaPlanViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(TemaPlanSerializer(self.get_queryset().get(pk=tema_plan.pk)).data)
+
+    @action(detail=True, methods=["post"], url_path="sugerir-dua")
+    def sugerir_dua(self, request, pk=None):
+        """Propone los apoyos DUA del tema con IA (no guarda; el docente revisa y guarda con PATCH)."""
+        tema_plan = self.get_object()
+        services.verificar_editable(tema_plan.plan)
+        return Response(ia.sugerir_dua(request.user, tema_plan))
 
     @action(detail=True, methods=["post"], url_path="actividades")
     def agregar_actividad(self, request, pk=None):

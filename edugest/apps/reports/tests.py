@@ -118,8 +118,12 @@ class ContenidoTests(ReportesBase):
         hojas = self.hojas(self.bajar("planes", self.doc1, formato="xlsx", estado_plan="APROBADA"))
         plan = hojas["Planes"][6]
         self.assertEqual(plan[:6], ["Luis Pérez", "Séptimo EGB A", "Matemática", self.doc1.full_name, "Alto", "Aprobada"])
-        self.assertEqual(plan[6], "0/4")
+        self.assertEqual(plan[6], "0/5")  # 4 del banco + la guía de Reflexión (ERCA)
         self.assertEqual(hojas["Resultado por tema"][6][2], "Fracciones")
+        dua = hojas["Apoyos DUA por tema"][6]
+        self.assertEqual(dua[2], "Fracciones")
+        self.assertIn("material concreto", dua[4])
+        self.assertEqual(dua[6], "Reglas del sistema")
 
     def test_avance_del_representante(self):
         texto = self.texto_pdf(self.bajar("avance", self.rep1, estudiante=self.est1.id))
