@@ -54,3 +54,6 @@ if env("TEST_DB_HOST", default=""):  # noqa: F405
 # Pruebas: correos en memoria (mail.outbox) y envío en el mismo hilo para poder verificarlos.
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 NOTIFICACIONES_ASINCRONAS = False
+
+# Pruebas: la cola de accesos se procesa en el mismo hilo.
+COLA_ACCESOS_ASINCRONA = False

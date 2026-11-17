@@ -96,8 +96,12 @@ def _en_hilo(pendientes):
     threading.Thread(target=trabajo, daemon=True, name="edugest-correo").start()
 
 
-def notificar(usuarios, categoria, tipo, titulo, mensaje, enlace="", correo=None, inmediato=False):
-    """Crea un aviso por usuario activo y programa el correo. Devuelve las notificaciones."""
+def notificar(usuarios, categoria, tipo, titulo, mensaje, enlace="", correo=None, inmediato=False, enviar_ya=False):
+    """
+    Crea un aviso por usuario activo y programa el correo. Devuelve las notificaciones.
+    enviar_ya=True envía en este momento (sin esperar el commit) para conocer el resultado;
+    lo usa la cola de envíos de acceso, que trabaja fuera de transacciones.
+    """
     creadas, pendientes = [], []
     for usuario in {u.pk: u for u in usuarios if u and u.is_active}.values():
         if correo is None:
@@ -114,7 +118,11 @@ def notificar(usuarios, categoria, tipo, titulo, mensaje, enlace="", correo=None
         if estado == Estado.PENDIENTE:
             pendientes.append((n.pk, usuario, correo))
 
-    if pendientes:
+    if pendientes and enviar_ya:
+        _enviar(pendientes)
+        for n in creadas:
+            n.refresh_from_db(fields=["estado_correo", "error_correo"])
+    elif pendientes:
         asincrono = getattr(settings, "NOTIFICACIONES_ASINCRONAS", True) and not inmediato
         transaction.on_commit(lambda: (_en_hilo if asincrono else _enviar)(pendientes))
     return creadas

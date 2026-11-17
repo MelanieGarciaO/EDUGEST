@@ -49,11 +49,15 @@ class UserSerializer(serializers.ModelSerializer):
         return bool(user.must_change_password and user.last_login is None)
 
     def get_correo_acceso(self, user):
-        """Estado del último correo de acceso: ENVIADO | ERROR | PENDIENTE | None (sin registro)."""
+        """Estado del correo de acceso: EN_COLA | ENVIADO | ERROR | PENDIENTE | None (sin registro)."""
         if not self.get_acceso_pendiente(user):
             return None
         if hasattr(user, "estado_correo_acceso"):  # anotado en la lista (sin consultas extra)
-            return user.estado_correo_acceso
+            return "EN_COLA" if getattr(user, "envio_en_cola", False) else user.estado_correo_acceso
+        from .models import EnvioAcceso
+
+        if EnvioAcceso.objects.filter(usuario=user, estado__in=("PENDIENTE", "ENVIANDO")).exists():
+            return "EN_COLA"  # importado: su correo de acceso aún está en la cola
         from apps.notifications.models import Notificacion
 
         return (

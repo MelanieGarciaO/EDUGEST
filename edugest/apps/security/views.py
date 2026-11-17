@@ -1,5 +1,7 @@
 from django.conf import settings
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import Exists, OuterRef, Q, Subquery
+from django.http import HttpResponse
+from rest_framework.parsers import FormParser, MultiPartParser
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -9,8 +11,8 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from . import avisos, recuperacion
-from .models import Role, User
+from . import avisos, cola_accesos, exportaciones, importaciones, recuperacion
+from .models import EnvioAcceso, Role, User
 from .permissions import IsAdministrador
 from .serializers import (
     AceptarTerminosSerializer,
@@ -153,7 +155,10 @@ class UserViewSet(viewsets.ModelViewSet):
             Notificacion.objects.filter(usuario=OuterRef("pk"), tipo__in=TIPOS_CORREO_ACCESO)
             .order_by("-created_at", "-id").values("estado_correo")[:1]
         )
-        qs = User.objects.annotate(estado_correo_acceso=Subquery(ultimo_correo))
+        en_cola = EnvioAcceso.objects.filter(
+            usuario=OuterRef("pk"), estado__in=(EnvioAcceso.Estado.PENDIENTE, EnvioAcceso.Estado.ENVIANDO)
+        )
+        qs = User.objects.annotate(estado_correo_acceso=Subquery(ultimo_correo), envio_en_cola=Exists(en_cola))
         params = self.request.query_params
 
         role = params.get("role")
@@ -179,6 +184,52 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ("update", "partial_update"):
             return UserUpdateSerializer
         return UserSerializer
+
+    def list(self, request, *args, **kwargs):
+        # Si quedaron correos en cola (p. ej. el servidor se reinició), se retoman al abrir la lista.
+        cola_accesos.despertar_si_hay_pendientes()
+        return super().list(request, *args, **kwargs)
+
+    # --- Importación y exportación con Excel ------------------------------------
+    @action(detail=False, methods=["get"])
+    def plantilla(self, request):
+        """GET users/plantilla/ — Excel con las columnas y la lista de roles."""
+        respuesta = HttpResponse(importaciones.generar_plantilla(), content_type=importaciones.CONTENT_TYPE)
+        respuesta["Content-Disposition"] = 'attachment; filename="plantilla_usuarios.xlsx"'
+        respuesta["Cache-Control"] = "no-store"
+        return respuesta
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    def importar(self, request):
+        """
+        POST users/importar/ (multipart: archivo, confirmar=true|false)
+        Sin confirmar: vista previa. Confirmando: registra todo o nada y pone en cola el correo
+        con la contraseña temporal de cada usuario (se envían en segundo plano).
+        """
+        confirmar = str(request.data.get("confirmar", "")).lower() == "true"
+        resultado = importaciones.importar(request.FILES.get("archivo"), confirmar)
+        if confirmar and resultado["errores"]:
+            return Response(
+                {"archivo": [importaciones.MENSAJE_CON_ERRORES], "vista_previa": resultado},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(resultado)
+
+    @action(detail=False, methods=["get"])
+    def exportar(self, request):
+        """GET users/exportar/ — Excel con el listado, aplicando los mismos filtros de la pantalla."""
+        reporte = exportaciones.usuarios(self.get_queryset(), request)
+        respuesta = HttpResponse(exportaciones.a_xlsx(reporte), content_type=exportaciones.CONTENT_TYPE_XLSX)
+        respuesta["Content-Disposition"] = f'attachment; filename="{exportaciones.nombre_archivo(reporte)}"'
+        respuesta["Cache-Control"] = "no-store"
+        return respuesta
+
+    @action(detail=False, methods=["get"], url_path="cola-accesos")
+    def cola_accesos_estado(self, request):
+        """GET users/cola-accesos/?lote=… — avance del envío de correos de una importación."""
+        lote = request.query_params.get("lote", "")
+        conteo = cola_accesos.resumen_lote(lote) if lote else {}
+        return Response({"lote": lote, **conteo})
 
     @action(detail=True, methods=["post"])
     def deactivate(self, request, pk=None):
@@ -216,6 +267,7 @@ class UserViewSet(viewsets.ModelViewSet):
                            "con «¿Olvidaste tu contraseña?» en la pantalla de inicio."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        cola_accesos.cancelar_pendientes(user)  # si estaba en cola por una importación
         recuperacion.asignar_clave_bienvenida(user, motivo=avisos.REENVIADA)  # nuevo plazo de 2 horas
         datos = UserSerializer(self.get_queryset().get(pk=user.pk)).data
         if datos["correo_acceso"] == "ERROR":
