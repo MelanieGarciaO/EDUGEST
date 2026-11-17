@@ -26,8 +26,9 @@ async function leerErrorBlob(error) {
 /**
  * Importación masiva desde Excel/CSV en dos pasos: vista previa y confirmación.
  * `endpoint`: base del recurso (p. ej. /academic/estudiantes/). `columnas`: [{ campo, titulo }].
+ * `notaExito`: texto opcional que se muestra después de importar.
  */
-export default function ImportarExcel({ endpoint, titulo, columnas, disabled, motivo }) {
+export default function ImportarExcel({ endpoint, titulo, columnas, disabled, motivo, notaExito }) {
     const queryClient = useQueryClient()
     const input = useRef(null)
     const [abierto, setAbierto] = useState(false)
@@ -160,6 +161,7 @@ export default function ImportarExcel({ endpoint, titulo, columnas, disabled, mo
                         <Alert tone="ok">
                             {`Se registraron ${creados} ${creados === 1 ? 'registro' : 'registros'}.`}
                             {vista?.omitidas ? ` ${vista.omitidas} ya existían y se omitieron.` : ''}
+                            {notaExito && creados > 0 ? <span className="mt-1 block">{notaExito}</span> : null}
                         </Alert>
                     )}
 

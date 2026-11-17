@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MailWarning, Pencil, Plus, Search, Send, UserCheck, UserX, Users as UsersIcon } from 'lucide-react'
+import { Clock, MailWarning, Pencil, Plus, Search, Send, UserCheck, UserX, Users as UsersIcon } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
@@ -20,6 +20,8 @@ import {
 } from '../../components/ui'
 import { useDebouncedValue } from '../../lib/hooks'
 import { ROLE_LABELS } from '../../lib/roles'
+import ExportarExcel from '../../components/ExportarExcel'
+import ImportarExcel from '../../components/ImportarExcel'
 
 const PAGE_SIZE = 20
 const ROLE_OPTIONS = Object.entries(ROLE_LABELS)
@@ -163,6 +165,8 @@ export default function Users() {
         queryKey: ['users', params],
         queryFn: async () => (await api.get('/security/users/', { params })).data,
         placeholderData: (previous) => previous,
+        // Mientras haya correos de acceso en cola (importación), la lista se actualiza sola.
+        refetchInterval: (query) => (query.state.data?.results?.some((u) => u.correo_acceso === 'EN_COLA') ? 5000 : false),
     })
 
     const refresh = () => {
@@ -198,10 +202,24 @@ export default function Users() {
     return (
         <>
             <PageHeader title="Usuarios" subtitle="Crea y administra las cuentas de docentes, representantes y administradores.">
-                <Button onClick={() => setForm({})}>
-                    <Plus className="size-5" aria-hidden="true" />
-                    Nuevo usuario
-                </Button>
+                <div className="flex flex-wrap items-start gap-2">
+                    <ExportarExcel url="/security/users/exportar/" params={{ ...params, page: undefined }} archivo="usuarios.xlsx" />
+                    <ImportarExcel
+                        endpoint="/security/users/"
+                        titulo="Importar usuarios"
+                        columnas={[
+                            { campo: 'nombres', titulo: 'Nombres' },
+                            { campo: 'apellidos', titulo: 'Apellidos' },
+                            { campo: 'correo', titulo: 'Correo' },
+                            { campo: 'rol', titulo: 'Rol' },
+                        ]}
+                        notaExito="Cada usuario recibirá su propia contraseña temporal por correo. Los correos se envían en cola durante los próximos minutos; puedes seguir el avance en la lista («Correo en cola»)."
+                    />
+                    <Button onClick={() => setForm({})}>
+                        <Plus className="size-5" aria-hidden="true" />
+                        Nuevo usuario
+                    </Button>
+                </div>
             </PageHeader>
 
             {aviso && (
@@ -275,7 +293,15 @@ export default function Users() {
                                                 </Chip>
                                             </span>
                                         )}
-                                        {u.is_active && u.acceso_pendiente && u.correo_acceso !== 'ERROR' && (
+                                        {u.is_active && u.acceso_pendiente && u.correo_acceso === 'EN_COLA' && (
+                                            <span title="Usuario importado: su correo con la contraseña temporal está en la cola de envío.">
+                                                <Chip tone="brand">
+                                                    <Clock className="mr-1 inline size-3.5" aria-hidden="true" />
+                                                    Correo en cola
+                                                </Chip>
+                                            </span>
+                                        )}
+                                        {u.is_active && u.acceso_pendiente && !['ERROR', 'EN_COLA'].includes(u.correo_acceso) && (
                                             <span
                                                 title={
                                                     vencida(u)
