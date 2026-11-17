@@ -348,6 +348,8 @@ NOTIFICACIONES_ASINCRONAS = env.bool("NOTIFICACIONES_ASINCRONAS", default=True)
 RECUPERACION_MINUTOS = env.int("RECUPERACION_MINUTOS", default=10)
 RECUPERACION_MAX_INTENTOS = env.int("RECUPERACION_MAX_INTENTOS", default=5)
 RECUPERACION_ESPERA_SEGUNDOS = env.int("RECUPERACION_ESPERA_SEGUNDOS", default=60)
+# Plazo de la contraseña temporal de bienvenida; al vencer se envía otra al intentar ingresar.
+CLAVE_BIENVENIDA_HORAS = env.int("CLAVE_BIENVENIDA_HORAS", default=2)
 
 # ---------------------------------------------------------------------------
 # Logging

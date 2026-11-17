@@ -1,14 +1,13 @@
 from django.conf import settings
-from django.contrib.auth.password_validation import (
-    validate_password as django_validate_password,
-)
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Role, User
-from .utils import generate_temporary_password
+
+
+TIPOS_CORREO_ACCESO = ("cuenta_creada", "acceso_reenviado", "acceso_renovado")  # = avisos.TIPOS_ACCESO
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -16,6 +15,9 @@ class UserSerializer(serializers.ModelSerializer):
 
     full_name = serializers.CharField(read_only=True)
     debe_aceptar_terminos = serializers.SerializerMethodField()
+    # Para el admin: cuenta creada que aún no se activa y si el correo de acceso llegó.
+    acceso_pendiente = serializers.SerializerMethodField()
+    correo_acceso = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -28,16 +30,36 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "is_active",
             "must_change_password",
+            "clave_temporal_expira_en",
             "debe_aceptar_terminos",
             "terminos_version",
             "terminos_aceptados_en",
             "date_joined",
             "last_login",
+            "acceso_pendiente",
+            "correo_acceso",
         )
         read_only_fields = fields
 
     def get_debe_aceptar_terminos(self, user):
         return user.terminos_version != settings.LEGAL_VERSION
+
+    def get_acceso_pendiente(self, user):
+        """Nunca ingresó y tiene la contraseña temporal del correo de bienvenida."""
+        return bool(user.must_change_password and user.last_login is None)
+
+    def get_correo_acceso(self, user):
+        """Estado del último correo de acceso: ENVIADO | ERROR | PENDIENTE | None (sin registro)."""
+        if not self.get_acceso_pendiente(user):
+            return None
+        if hasattr(user, "estado_correo_acceso"):  # anotado en la lista (sin consultas extra)
+            return user.estado_correo_acceso
+        from apps.notifications.models import Notificacion
+
+        return (
+            Notificacion.objects.filter(usuario=user, tipo__in=TIPOS_CORREO_ACCESO)
+            .order_by("-created_at", "-id").values_list("estado_correo", flat=True).first()
+        )
 
 
 class LoginSerializer(TokenObtainPairSerializer):
@@ -52,6 +74,11 @@ class LoginSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        # Contraseña temporal de bienvenida correcta pero vencida: se envía otra por correo.
+        from .recuperacion import renovar_si_vencio
+
+        email = (attrs.get(self.username_field) or "").strip()
+        renovar_si_vencio(User.objects.filter(email__iexact=email).first(), attrs.get("password") or "")
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user).data
         return data
@@ -70,36 +97,30 @@ class LogoutSerializer(serializers.Serializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    old_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True)
+    """
+    La validación de la clave temporal y de la contraseña nueva la hace
+    recuperacion.cambiar_clave (primer acceso, cuenta recuperada o cambio desde el Perfil).
+    """
 
-    def validate_old_password(self, value):
-        user = self.context["request"].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("La contraseña actual es incorrecta.")
-        return value
+    clave_temporal = serializers.CharField(write_only=True, trim_whitespace=True)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
 
-    def validate(self, attrs):
-        user = self.context["request"].user
-        if attrs["old_password"] == attrs["new_password"]:
-            raise serializers.ValidationError(
-                {"new_password": "La nueva contraseña debe ser distinta de la actual."}
-            )
-        django_validate_password(attrs["new_password"], user)
-        return attrs
+
+class RestablecerSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    clave_temporal = serializers.CharField(trim_whitespace=True)
+    new_password = serializers.CharField(trim_whitespace=False)
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     """
-    Alta de usuarios por el administrador. Si no se envía contraseña, se genera una
-    temporal que se devuelve UNA sola vez en la respuesta.
+    Alta de usuarios por el administrador. El sistema genera una contraseña temporal y la
+    envía SOLO al correo del usuario: el administrador no la ve ni puede fijar una.
     """
-
-    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ("email", "first_name", "last_name", "role", "password")
+        fields = ("email", "first_name", "last_name", "role")
 
     def validate_email(self, value):
         value = value.lower()
@@ -107,31 +128,15 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ya existe un usuario con este correo.")
         return value
 
-    def validate_password(self, value):
-        if value:
-            django_validate_password(value)
-        return value
-
     def create(self, validated_data):
-        password = validated_data.pop("password", "") or None
-        self._generated_password = None
-        if password is None:
-            password = generate_temporary_password()
-            self._generated_password = password
-        usuario = User.objects.create_user(
-            password=password, must_change_password=True, **validated_data
-        )
-        from . import avisos
+        from .recuperacion import asignar_clave_bienvenida
 
-        avisos.cuenta_creada(usuario, password)  # bienvenida con la contraseña temporal
+        usuario = User.objects.create_user(password=None, must_change_password=True, **validated_data)
+        asignar_clave_bienvenida(usuario)  # vence en 2 horas y solo viaja por correo
         return usuario
 
     def to_representation(self, instance):
-        data = UserSerializer(instance).data
-        generated = getattr(self, "_generated_password", None)
-        if generated:
-            data["temporary_password"] = generated
-        return data
+        return UserSerializer(instance).data
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

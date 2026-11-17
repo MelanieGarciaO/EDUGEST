@@ -63,6 +63,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Las cuentas las crea el administrador con una contraseña temporal;
     # mientras este indicador esté activo el usuario solo puede cambiar su contraseña.
     must_change_password = models.BooleanField("debe cambiar la contraseña", default=True)
+    # Vencimiento de la contraseña temporal de bienvenida (2 horas). Si el usuario intenta
+    # ingresar con ella ya vencida, el sistema le envía una nueva. Nulo = sin vencimiento.
+    clave_temporal_expira_en = models.DateTimeField("la clave temporal vence el", null=True, blank=True)
 
     # Aceptación de los términos de uso y de la política de privacidad (LOPDP). Se guarda la
     # versión aceptada: si la institución publica una versión nueva, se vuelve a pedir.
@@ -95,6 +98,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.first_name} {self.last_name}".strip()
 
     @property
+    def clave_temporal_vencida(self):
+        return bool(
+            self.must_change_password
+            and self.clave_temporal_expira_en
+            and self.clave_temporal_expira_en <= timezone.now()
+        )
+
+    @property
     def is_administrador(self):
         return self.role == Role.ADMINISTRADOR
 
@@ -109,11 +120,20 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 class CodigoRecuperacion(models.Model):
     """
-    Código OTP de 6 dígitos para recuperar la contraseña. Solo se guarda su hash (como una
-    contraseña): ni la base de datos ni el admin conocen el código. Caduca y admite pocos intentos.
+    Credencial de un solo uso que el sistema envía por correo. Solo se guarda su hash (como
+    una contraseña): ni la base de datos ni el admin la conocen. Caduca y admite pocos intentos.
+
+    - RECUPERACION: código OTP de 6 dígitos de «¿Olvidaste tu contraseña?».
+    - CAMBIO_CLAVE: clave temporal que se pide desde el Perfil para cambiar la contraseña.
+      NO reemplaza la contraseña actual: si no se usa, vence y todo sigue igual.
     """
 
+    class Tipo(models.TextChoices):
+        RECUPERACION = "RECUPERACION", "Código para recuperar la contraseña"
+        CAMBIO_CLAVE = "CAMBIO_CLAVE", "Clave temporal para cambiar la contraseña"
+
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="codigos_recuperacion")
+    tipo = models.CharField(max_length=15, choices=Tipo.choices, default=Tipo.RECUPERACION, db_index=True)
     codigo_hash = models.CharField(max_length=128)
     expira_en = models.DateTimeField()
     intentos = models.PositiveSmallIntegerField(default=0)

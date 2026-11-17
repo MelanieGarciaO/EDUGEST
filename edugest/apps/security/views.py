@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -17,11 +17,13 @@ from .serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
     LogoutSerializer,
+    RestablecerSerializer,
+    TIPOS_CORREO_ACCESO,
     UserCreateSerializer,
     UserSerializer,
     UserUpdateSerializer,
 )
-from .utils import generate_temporary_password, revoke_user_tokens
+from .utils import revoke_user_tokens
 
 
 class LoginView(TokenObtainPairView):
@@ -90,33 +92,47 @@ class AceptarTerminosView(APIView):
         return Response(UserSerializer(user).data)
 
 
+def _sesion_nueva(user, detalle):
+    """Tokens nuevos tras cambiar la contraseña (las demás sesiones ya se cerraron)."""
+    refresh = LoginSerializer.get_token(user)
+    return Response(
+        {
+            "detail": detalle,
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "user": UserSerializer(user).data,
+        }
+    )
+
+
 class ChangePasswordView(APIView):
-    """POST: cambia la contraseña, cierra las demás sesiones y entrega tokens nuevos."""
+    """
+    POST {clave_temporal, new_password}: crea la contraseña nueva con la clave temporal que
+    llegó por correo (primer acceso, cuenta recuperada o la pedida desde el Perfil).
+    Cierra las demás sesiones y entrega tokens nuevos.
+    """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = ChangePasswordSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = ChangePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+        user = recuperacion.cambiar_clave(request.user, datos["clave_temporal"], datos["new_password"])
+        return _sesion_nueva(user, "Contraseña actualizada correctamente.")
 
-        user = request.user
-        user.set_password(serializer.validated_data["new_password"])
-        user.must_change_password = False
-        user.save(update_fields=["password", "must_change_password", "updated_at"])
 
-        revoke_user_tokens(user)
-        avisos.clave_cambiada(user)
-        refresh = LoginSerializer.get_token(user)
-        return Response(
-            {
-                "detail": "Contraseña actualizada correctamente.",
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-                "user": UserSerializer(user).data,
-            }
-        )
+class ClaveTemporalView(APIView):
+    """POST: envía al correo del usuario una clave temporal para cambiar la contraseña desde el Perfil."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        minutos = recuperacion.solicitar_clave_perfil(request.user, _ip(request))
+        return Response({
+            "detail": f"Te enviamos una clave temporal a {request.user.email}. Vence en {minutos} minutos.",
+            "minutos": minutos,
+        })
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -131,7 +147,13 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
-        qs = User.objects.all()
+        from apps.notifications.models import Notificacion
+
+        ultimo_correo = (
+            Notificacion.objects.filter(usuario=OuterRef("pk"), tipo__in=TIPOS_CORREO_ACCESO)
+            .order_by("-created_at", "-id").values("estado_correo")[:1]
+        )
+        qs = User.objects.annotate(estado_correo_acceso=Subquery(ultimo_correo))
         params = self.request.query_params
 
         role = params.get("role")
@@ -178,27 +200,30 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save(update_fields=["is_active", "updated_at"])
         return Response(UserSerializer(user).data)
 
-    @action(detail=True, methods=["post"], url_path="reset-password")
-    def reset_password(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="reenviar-acceso")
+    def reenviar_acceso(self, request, pk=None):
+        """
+        Reenvía el correo de bienvenida con una contraseña temporal NUEVA, solo a cuentas que
+        aún no se han activado (por ejemplo, si el primer correo no llegó). El administrador
+        no ve la contraseña. Si el usuario ya ingresó alguna vez, debe usar «¿Olvidaste tu contraseña?».
+        """
         user = self.get_object()
-        if user == request.user:
+        if not user.is_active:
+            return Response({"detail": "Activa la cuenta antes de reenviar el acceso."}, status=status.HTTP_400_BAD_REQUEST)
+        if not (user.must_change_password and user.last_login is None):
             return Response(
-                {"detail": "Para tu propia cuenta usa el cambio de contraseña."},
+                {"detail": "Este usuario ya activó su cuenta. Si olvidó su contraseña, puede recuperarla "
+                           "con «¿Olvidaste tu contraseña?» en la pantalla de inicio."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        temporary_password = generate_temporary_password()
-        user.set_password(temporary_password)
-        user.must_change_password = True
-        user.save(update_fields=["password", "must_change_password", "updated_at"])
-        revoke_user_tokens(user)
-        avisos.clave_restablecida(user, temporary_password, por=request.user)
-        return Response(
-            {
-                "detail": "Contraseña temporal generada y enviada al correo del usuario. "
-                "Entrégala también si hace falta; no se volverá a mostrar.",
-                "temporary_password": temporary_password,
-            }
-        )
+        recuperacion.asignar_clave_bienvenida(user, motivo=avisos.REENVIADA)  # nuevo plazo de 2 horas
+        datos = UserSerializer(self.get_queryset().get(pk=user.pk)).data
+        if datos["correo_acceso"] == "ERROR":
+            return Response(
+                {**datos, "detail": f"No se pudo enviar el correo a {user.email}. Revisa la dirección o el servicio de correo."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response({**datos, "detail": f"Se envió un nuevo correo de acceso a {user.email}."})
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +253,20 @@ class RecuperarVerificarView(APIView):
     def post(self, request):
         temporal = recuperacion.verificar(request.data.get("email"), request.data.get("codigo"), _ip(request))
         return Response({
-            "detail": "Código verificado. Usa esta contraseña temporal para ingresar y crear tu contraseña nueva.",
+            "detail": "Código verificado. Usa esta contraseña temporal para crear tu contraseña nueva.",
             "temporary_password": temporal,
         })
+
+
+class RecuperarRestablecerView(APIView):
+    """POST {email, clave_temporal, new_password}: crea la contraseña nueva en el recuperador e inicia sesión."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = RestablecerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        d = serializer.validated_data
+        user = recuperacion.restablecer(d["email"], d["clave_temporal"], d["new_password"], _ip(request))
+        return _sesion_nueva(user, "Tu contraseña nueva quedó guardada.")

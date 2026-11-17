@@ -1,5 +1,8 @@
+import re
+
+from django.core import mail
 from django.core.cache import cache
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from rest_framework.test import APITestCase
 
 from .models import Role, User
@@ -106,28 +109,36 @@ class RolePermissionTests(BaseAPITest):
 
 
 class UserManagementTests(BaseAPITest):
-    def test_admin_crea_usuario_con_clave_temporal(self):
+    def test_admin_crea_usuario_y_la_clave_llega_solo_por_correo(self):
         self.auth(self.admin)
-        res = self.client.post(
-            reverse("user-list"),
-            {
-                "email": "Nueva@Edugest.test",
-                "first_name": "Ana",
-                "last_name": "Torres",
-                "role": Role.DOCENTE,
-            },
-        )
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                reverse("user-list"),
+                {
+                    "email": "Nueva@Edugest.test",
+                    "first_name": "Ana",
+                    "last_name": "Torres",
+                    "role": Role.DOCENTE,
+                    "password": "ClaveQueElAdminQuiereFijar1",  # se ignora: el admin no maneja claves
+                },
+            )
         self.assertEqual(res.status_code, 201)
-        self.assertIn("temporary_password", res.data)
+        self.assertNotIn("temporary_password", res.data)
         self.assertTrue(res.data["must_change_password"])
+        self.assertTrue(res.data["acceso_pendiente"])
         self.assertEqual(res.data["email"], "nueva@edugest.test")
 
-        # El nuevo usuario puede ingresar, pero queda obligado a cambiar la clave.
+        # La temporal llegó al correo del usuario; no es la que intentó fijar el admin.
+        [correo] = mail.outbox
+        self.assertEqual(correo.to, ["nueva@edugest.test"])
+        temporal = re.search(r"^\s{4}(\S{12})\s*$", correo.body, re.M).group(1)
+        nuevo = User.objects.get(email="nueva@edugest.test")
+        self.assertFalse(nuevo.check_password("ClaveQueElAdminQuiereFijar1"))
+
+        # El nuevo usuario puede ingresar, pero queda obligado a crear su contraseña.
         self.client.credentials()
-        login = self.client.post(
-            reverse("login"),
-            {"email": "nueva@edugest.test", "password": res.data["temporary_password"]},
-        )
+        login = self.client.post(reverse("login"), {"email": "nueva@edugest.test", "password": temporal})
         self.assertEqual(login.status_code, 200)
         self.assertTrue(login.data["user"]["must_change_password"])
 
@@ -180,13 +191,14 @@ class UserManagementTests(BaseAPITest):
         res = self.client.delete(reverse("user-detail", args=[self.docente.pk]))
         self.assertEqual(res.status_code, 405)
 
-    def test_reset_de_contrasena(self):
+    def test_el_admin_ya_no_restablece_contrasenas(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("user-reset-password", args=[self.docente.pk])
         self.auth(self.admin)
-        res = self.client.post(reverse("user-reset-password", args=[self.docente.pk]))
-        self.assertEqual(res.status_code, 200)
+        res = self.client.post(f"/api/security/users/{self.docente.pk}/reset-password/")
+        self.assertEqual(res.status_code, 404)
         self.docente.refresh_from_db()
-        self.assertTrue(self.docente.must_change_password)
-        self.assertTrue(self.docente.check_password(res.data["temporary_password"]))
+        self.assertTrue(self.docente.check_password(PASSWORD))
 
 
 class PasswordChangeTests(BaseAPITest):
@@ -198,14 +210,14 @@ class PasswordChangeTests(BaseAPITest):
         # Pero puede consultar su perfil.
         self.assertEqual(self.client.get(reverse("me")).status_code, 200)
 
-    def test_cambio_de_clave_libera_el_acceso_y_devuelve_tokens_nuevos(self):
+    def test_primer_acceso_con_la_temporal_libera_la_api_y_devuelve_tokens_nuevos(self):
         temporal = make_user("temp@edugest.test", Role.ADMINISTRADOR, must_change_password=True)
         viejo = self.auth(temporal)
         res = self.client.post(
             reverse("change-password"),
-            {"old_password": PASSWORD, "new_password": "OtraClaveMasLarga77"},
+            {"clave_temporal": PASSWORD, "new_password": "OtraClaveMasLarga77"},
         )
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.status_code, 200, res.data)
         self.assertFalse(res.data["user"]["must_change_password"])
 
         # El refresh anterior queda invalidado y el nuevo access ya permite operar.
@@ -215,21 +227,33 @@ class PasswordChangeTests(BaseAPITest):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.data['access']}")
         self.assertEqual(self.client.get(reverse("user-list")).status_code, 200)
 
-    def test_clave_actual_incorrecta(self):
-        self.auth(self.docente)
+    def test_temporal_incorrecta_en_el_primer_acceso(self):
+        temporal = make_user("temp@edugest.test", Role.DOCENTE, must_change_password=True)
+        self.auth(temporal)
         res = self.client.post(
-            reverse("change-password"),
-            {"old_password": "mala", "new_password": "OtraClaveMasLarga77"},
+            reverse("change-password"), {"clave_temporal": "mala", "new_password": "OtraClaveMasLarga77"}
         )
         self.assertEqual(res.status_code, 400)
+        self.assertIn("clave_temporal", res.data)
+
+    def test_desde_el_perfil_no_basta_la_contrasena_actual(self):
+        self.auth(self.docente)
+        res = self.client.post(
+            reverse("change-password"), {"clave_temporal": PASSWORD, "new_password": "OtraClaveMasLarga77"}
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Primero solicita una clave temporal", str(res.data["clave_temporal"]))
+        self.docente.refresh_from_db()
+        self.assertTrue(self.docente.check_password(PASSWORD))
 
     def test_clave_nueva_debil(self):
-        self.auth(self.docente)
+        temporal = make_user("temp@edugest.test", Role.DOCENTE, must_change_password=True)
+        self.auth(temporal)
         res = self.client.post(
-            reverse("change-password"),
-            {"old_password": PASSWORD, "new_password": "12345678"},
+            reverse("change-password"), {"clave_temporal": PASSWORD, "new_password": "12345678"}
         )
         self.assertEqual(res.status_code, 400)
+        self.assertIn("new_password", res.data)
 
 
 class SuperuserTests(BaseAPITest):
