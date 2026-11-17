@@ -181,7 +181,8 @@ export default function Recursos() {
 
     const grados = useGrados()
     const asignaturas = useAsignaturasActivas()
-    const temas = useTemasActivos()
+    // El docente solo elige temas de las asignaturas y grados que tiene asignados.
+    const temas = useTemasActivos({ propios: !isAdmin })
 
     const params = {
         page,

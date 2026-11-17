@@ -132,3 +132,42 @@ class SeedTemasTests(AcademicBase):
         self.assertTrue(
             Tema.objects.filter(nombre="Fracciones equivalentes", padre__nombre="Fracciones").exists()
         )
+
+
+class TemasPropiosDocenteTests(AcademicBase):
+    """?propios=true: el docente solo ve los temas de sus asignaturas en el grado de sus paralelos."""
+
+    def setUp(self):
+        super().setUp()
+        self.grado5 = Grado.objects.create(nombre="Quinto EGB", orden=5)
+        self.mate7 = Tema.objects.create(grado=self.grado7, asignatura=self.mate, nombre="Fracciones")
+        self.sub_mate7 = Tema.objects.create(
+            grado=self.grado7, asignatura=self.mate, padre=self.mate7, nombre="Fracciones mixtas"
+        )
+        self.lengua7 = Tema.objects.create(grado=self.grado7, asignatura=self.lengua, nombre="Ortografía")
+        self.mate5 = Tema.objects.create(grado=self.grado5, asignatura=self.mate, nombre="Operaciones combinadas")
+        self.url = reverse("tema-list")
+
+    def ids_propios(self, user, **extra):
+        self.auth(user)
+        return self.ids(self.client.get(self.url, {"propios": "true", **extra}))
+
+    def test_docente_solo_ve_su_asignatura_y_grado(self):
+        # doc1: Matemática en 7.º A -> ni Lengua de 7.º ni Matemática de 5.º
+        self.assertEqual(self.ids_propios(self.doc1), sorted([self.mate7.id, self.sub_mate7.id]))
+        self.assertEqual(self.ids_propios(self.doc2), [self.lengua7.id])
+
+    def test_asignacion_inactiva_no_cuenta(self):
+        self.asig1.is_active = False
+        self.asig1.save()
+        self.assertEqual(self.ids_propios(self.doc1), [])
+
+    def test_admin_ve_todos_aunque_pida_propios(self):
+        self.assertEqual(
+            self.ids_propios(self.admin),
+            sorted([self.mate7.id, self.sub_mate7.id, self.lengua7.id, self.mate5.id]),
+        )
+
+    def test_sin_el_parametro_no_cambia_el_catalogo(self):
+        self.auth(self.doc1)
+        self.assertEqual(len(self.ids(self.client.get(self.url))), 4)

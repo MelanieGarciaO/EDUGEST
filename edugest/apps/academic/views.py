@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.http import HttpResponse
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -6,6 +6,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
+from apps.security.models import Role
 from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
 
 from . import selectors
@@ -175,6 +176,8 @@ class TemaViewSet(AcademicViewSet):
     """
     Catálogo de temas y subtemas. Lectura para cualquier rol; escritura solo del
     administrador. Filtros: ?grado= ?asignatura= ?padre=<id>|null ?is_active= ?search=
+    ?propios=true -> para el docente, solo los temas de las asignaturas que imparte en el
+    grado de sus paralelos asignados (asignaciones activas). Para el admin no cambia nada.
     """
 
     serializer_class = TemaSerializer
@@ -190,6 +193,17 @@ class TemaViewSet(AcademicViewSet):
         else:
             qs = filter_by_id(qs, params, "padre", "padre_id")
         qs = filter_by_active(qs, params)
+        if params.get("propios") == "true" and self.request.user.role == Role.DOCENTE:
+            qs = qs.filter(
+                Exists(
+                    AsignacionDocente.objects.filter(
+                        docente=self.request.user,
+                        is_active=True,
+                        asignatura_id=OuterRef("asignatura_id"),
+                        paralelo__grado_id=OuterRef("grado_id"),
+                    )
+                )
+            )
         search = params.get("search")
         if search:
             qs = qs.filter(nombre__icontains=search)
