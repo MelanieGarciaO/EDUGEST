@@ -1,25 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { api, parseApiError } from '../api/client'
 import { Alert, Button, PasswordField } from './ui'
 
 const MIN = 10
-const VACIO = { actual: '', nueva: '', repetir: '' }
-const CLAVE_TEMPORAL = 'edugest:clave-temporal' // la deja la pantalla de recuperación
+
+const enviarPorDefecto = async (body) => (await api.post('/security/auth/change-password/', body)).data
 
 /**
- * Formulario de cambio de contraseña (lo usan el primer acceso y el Perfil).
- * Llama a onSuccess(data) con la respuesta del servidor (tokens nuevos y usuario).
+ * Crea la contraseña nueva con una CLAVE TEMPORAL que el usuario recibió por correo
+ * (o que vio en el recuperador). Lo usan el primer acceso, el recuperador y el Perfil.
+ *
+ * - `enviar(body)`: hace la petición; por defecto POST /auth/change-password/.
+ *   body = { clave_temporal, new_password }.
+ * - `temporalInicial`: valor precargado (el recuperador ya conoce la temporal).
+ * - Llama a onSuccess(data) con la respuesta (tokens nuevos y usuario).
  */
-export default function CambiarClaveForm({ forced = false, onSuccess, secondaryAction }) {
-    // Tras recuperar la cuenta con código, la contraseña actual (temporal) ya se conoce.
-    const [form, setForm] = useState(() => ({
-        ...VACIO,
-        actual: forced ? sessionStorage.getItem(CLAVE_TEMPORAL) ?? '' : '',
-    }))
-    useEffect(() => {
-        sessionStorage.removeItem(CLAVE_TEMPORAL) // se usa una sola vez
-    }, [])
+export default function CambiarClaveForm({
+    onSuccess,
+    secondaryAction,
+    enviar = enviarPorDefecto,
+    temporalInicial = '',
+    etiquetaTemporal = 'Contraseña temporal',
+    hintTemporal = 'Es la contraseña temporal que te llegó por correo.',
+    textoBoton = 'Guardar contraseña',
+}) {
+    const [form, setForm] = useState({ temporal: temporalInicial, nueva: '', repetir: '' })
     const [errors, setErrors] = useState({})
     const [general, setGeneral] = useState('')
     const [loading, setLoading] = useState(false)
@@ -29,9 +35,9 @@ export default function CambiarClaveForm({ forced = false, onSuccess, secondaryA
     async function onSubmit(e) {
         e.preventDefault()
         const local = {}
-        if (!form.actual) local.actual = 'Escribe tu contraseña actual.'
+        if (!form.temporal.trim()) local.temporal = 'Escribe la clave temporal.'
         if (form.nueva.length < MIN) local.nueva = `Debe tener al menos ${MIN} caracteres.`
-        else if (form.nueva === form.actual) local.nueva = 'La contraseña nueva debe ser distinta de la actual.'
+        else if (form.nueva === form.temporal.trim()) local.nueva = 'La contraseña nueva debe ser distinta de la temporal.'
         if (form.repetir !== form.nueva) local.repetir = 'Las contraseñas no coinciden.'
         setErrors(local)
         setGeneral('')
@@ -39,21 +45,27 @@ export default function CambiarClaveForm({ forced = false, onSuccess, secondaryA
 
         setLoading(true)
         try {
-            const { data } = await api.post('/security/auth/change-password/', {
-                old_password: form.actual,
-                new_password: form.nueva,
-            })
-            setForm(VACIO)
+            const data = await enviar({ clave_temporal: form.temporal.trim(), new_password: form.nueva })
             setLoading(false)
             onSuccess(data)
         } catch (err) {
             const { message, fields } = parseApiError(err)
+            const detalle = err?.response?.data?.detail ?? message
+            setLoading(false)
+
+            // Venció mientras tenía la sesión abierta: ya le llegó otra y puede escribirla aquí mismo.
+            if (err?.response?.data?.code === 'clave_temporal_vencida') {
+                setForm((f) => ({ ...f, temporal: '' }))
+                setErrors({ temporal: 'Escribe la nueva contraseña temporal que te acabamos de enviar.' })
+                setGeneral(detalle)
+                return
+            }
+
             const mapped = {}
-            if (fields.old_password) mapped.actual = fields.old_password
+            if (fields.clave_temporal) mapped.temporal = fields.clave_temporal
             if (fields.new_password) mapped.nueva = fields.new_password
             setErrors(mapped)
-            if (!Object.keys(mapped).length) setGeneral(message)
-            setLoading(false)
+            if (!Object.keys(mapped).length) setGeneral(detalle)
         }
     }
 
@@ -61,12 +73,12 @@ export default function CambiarClaveForm({ forced = false, onSuccess, secondaryA
         <form onSubmit={onSubmit} noValidate>
             {general ? <Alert className="mb-4">{general}</Alert> : null}
             <PasswordField
-                label="Contraseña actual"
-                autoComplete="current-password"
-                value={form.actual}
-                onChange={set('actual')}
-                error={errors.actual}
-                hint={forced ? 'Es la contraseña temporal que recibiste.' : undefined}
+                label={etiquetaTemporal}
+                autoComplete="one-time-code"
+                value={form.temporal}
+                onChange={set('temporal')}
+                error={errors.temporal}
+                hint={hintTemporal}
             />
             <PasswordField
                 className="mt-4"
@@ -87,7 +99,7 @@ export default function CambiarClaveForm({ forced = false, onSuccess, secondaryA
             />
             <div className="mt-6 flex flex-wrap gap-3">
                 <Button type="submit" loading={loading}>
-                    Guardar contraseña
+                    {textoBoton}
                 </Button>
                 {secondaryAction}
             </div>

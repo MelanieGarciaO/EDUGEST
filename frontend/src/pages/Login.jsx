@@ -17,11 +17,13 @@ export default function Login() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
+    const [aviso, setAviso] = useState('')
     const [loading, setLoading] = useState(false)
 
     async function onSubmit(e) {
         e.preventDefault()
         setError('')
+        setAviso('')
         setLoading(true)
         try {
             // Al guardar la sesión, PublicOnly redirige solo: clave temporal -> crear clave;
@@ -29,7 +31,13 @@ export default function Login() {
             await login(email.trim(), password)
         } catch (err) {
             const { status, message } = parseApiError(err)
-            setError(status === 401 || status === 400 ? 'Correo o contraseña incorrectos.' : message)
+            if (err?.response?.data?.code === 'clave_temporal_vencida') {
+                // La clave de bienvenida venció: el sistema ya envió otra al correo.
+                setAviso(err.response.data.detail)
+                setPassword('')
+            } else {
+                setError(status === 401 || status === 400 ? 'Correo o contraseña incorrectos.' : message)
+            }
             setLoading(false)
         }
     }
@@ -65,6 +73,7 @@ export default function Login() {
                     <p className="mt-1 text-ink-500">Ingresa con la cuenta que te entregó la institución.</p>
 
                     {error && <Alert className="mt-5">{error}</Alert>}
+                    {aviso && <Alert tone="warn" className="mt-5">{aviso}</Alert>}
 
                     <Field
                         className="mt-6"

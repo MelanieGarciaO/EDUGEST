@@ -16,10 +16,9 @@ export default function ChangePassword() {
                 <Card>
                     <h1 className="text-2xl font-extrabold tracking-tight text-navy-800">Crea tu contraseña</h1>
                     <p className="mt-1 mb-6 text-ink-500">
-                        {`Hola, ${user.first_name}. Por seguridad, cambia la contraseña temporal antes de continuar.`}
+                        {`Hola, ${user.first_name}. Por seguridad, crea tu propia contraseña con la contraseña temporal que recibiste en tu correo.`}
                     </p>
                     <CambiarClaveForm
-                        forced
                         onSuccess={applySession}
                         secondaryAction={
                             <Button variant="secondary" onClick={logout}>

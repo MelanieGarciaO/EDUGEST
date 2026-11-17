@@ -109,6 +109,8 @@ api.interceptors.response.use(
         const url = config?.url ?? ''
         if (
             response?.status === 401 &&
+            // La contraseña temporal venció y ya se envió otra al correo: no es una sesión vencida.
+            response?.data?.code !== 'clave_temporal_vencida' &&
             config &&
             !config._retry &&
             !SIN_RENOVACION.some((ruta) => url.includes(ruta))

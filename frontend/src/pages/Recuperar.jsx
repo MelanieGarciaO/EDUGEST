@@ -4,15 +4,15 @@ import { ArrowLeft, Check, Copy, KeyRound, Mail, ShieldCheck } from 'lucide-reac
 
 import { api, parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
+import CambiarClaveForm from '../components/CambiarClaveForm'
 import { Alert, Button, Card, Field, Logo } from '../components/ui'
 
-const CLAVE_TEMPORAL = 'edugest:clave-temporal' // la lee CambiarClaveForm
 const ESPERA = 60
 
 const PASOS = [
     { icon: Mail, texto: 'Correo' },
     { icon: ShieldCheck, texto: 'Código' },
-    { icon: KeyRound, texto: 'Clave temporal' },
+    { icon: KeyRound, texto: 'Nueva contraseña' },
 ]
 
 function Pasos({ actual }) {
@@ -35,7 +35,7 @@ function Pasos({ actual }) {
  * Con la temporal se inicia sesión y el sistema obliga a crear la contraseña nueva.
  */
 export default function Recuperar() {
-    const { login } = useAuth()
+    const { applySession } = useAuth() // al guardar la contraseña nueva, la sesión queda abierta
     const [paso, setPaso] = useState(0)
     const [email, setEmail] = useState('')
     const [codigo, setCodigo] = useState('')
@@ -89,19 +89,9 @@ export default function Recuperar() {
         }
     }
 
-    async function continuar() {
-        setCargando(true)
-        setError('')
-        try {
-            // La pantalla «Crea tu contraseña» usa la temporal sin que haya que escribirla.
-            sessionStorage.setItem(CLAVE_TEMPORAL, temporal)
-            await login(email.trim(), temporal) // PublicOnly redirige a /cambiar-clave
-        } catch (err) {
-            sessionStorage.removeItem(CLAVE_TEMPORAL)
-            setError(parseApiError(err).message)
-            setCargando(false)
-        }
-    }
+    // Último paso: la contraseña nueva se crea aquí mismo con la temporal que se mostró.
+    const restablecer = async (body) =>
+        (await api.post('/security/auth/recuperar/restablecer/', { email: email.trim(), ...body })).data
 
     async function copiar() {
         try {
@@ -168,8 +158,7 @@ export default function Recuperar() {
 
                     {paso === 2 && (
                         <div>
-                            <Alert tone="ok" className="mb-4">Código verificado. También te enviamos esta contraseña por correo.</Alert>
-                            <p className="mb-2 text-sm font-bold text-ink-700">Tu contraseña temporal</p>
+                            <Alert tone="ok" className="mb-4">Código verificado. Esta es tu contraseña temporal:</Alert>
                             <div className="flex items-center gap-2 rounded-xl border border-line bg-brand-50 p-3">
                                 <code className="flex-1 text-center font-mono text-xl font-bold tracking-wider text-navy-800">{temporal}</code>
                                 <Button variant="secondary" onClick={copiar} aria-label="Copiar contraseña temporal">
@@ -177,12 +166,16 @@ export default function Recuperar() {
                                     {copiado ? 'Copiada' : 'Copiar'}
                                 </Button>
                             </div>
-                            <p className="mt-3 text-sm text-ink-500">
-                                Solo se muestra una vez. En el siguiente paso crearás tu contraseña definitiva; se cerraron tus otras sesiones.
+                            <p className="mt-3 mb-5 text-sm text-ink-500">
+                                Solo se muestra una vez y ya la escribimos por ti abajo. Ahora crea tu contraseña definitiva; se cerraron tus otras sesiones.
                             </p>
-                            <Button onClick={continuar} loading={cargando} className="mt-6 w-full">
-                                Crear mi contraseña nueva
-                            </Button>
+                            <CambiarClaveForm
+                                enviar={restablecer}
+                                temporalInicial={temporal}
+                                hintTemporal="Es la contraseña temporal de arriba."
+                                textoBoton="Crear mi contraseña nueva"
+                                onSuccess={applySession}
+                            />
                         </div>
                     )}
 

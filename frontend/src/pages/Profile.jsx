@@ -1,11 +1,82 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, MailCheck } from 'lucide-react'
 
+import { api, parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import CambiarClaveForm from '../components/CambiarClaveForm'
 import { Alert, Avatar, Button, Card, PageHeader } from '../components/ui'
 import { ROLE_LABELS } from '../lib/roles'
+
+const ESPERA = 60
+
+/**
+ * Cambio de contraseña desde el Perfil:
+ * 1) el usuario pide una clave temporal -> le llega por correo (su contraseña actual no cambia);
+ * 2) escribe esa clave y su contraseña nueva.
+ */
+function CambioDeClave({ email, onCambiada }) {
+    const [paso, setPaso] = useState('inicio') // 'inicio' | 'enviada'
+    const [aviso, setAviso] = useState('')
+    const [error, setError] = useState('')
+    const [enviando, setEnviando] = useState(false)
+    const [espera, setEspera] = useState(0)
+
+    useEffect(() => {
+        if (!espera) return undefined
+        const t = setTimeout(() => setEspera((s) => s - 1), 1000)
+        return () => clearTimeout(t)
+    }, [espera])
+
+    async function pedirClave() {
+        setError('')
+        setEnviando(true)
+        try {
+            const { data } = await api.post('/security/auth/clave-temporal/')
+            setAviso(data.detail)
+            setPaso('enviada')
+            setEspera(ESPERA)
+        } catch (err) {
+            setError(err?.response?.data?.detail ?? parseApiError(err).message)
+        } finally {
+            setEnviando(false)
+        }
+    }
+
+    if (paso === 'inicio') {
+        return (
+            <div className="mt-3">
+                <p className="text-sm text-ink-700">
+                    {`Para cambiar tu contraseña te enviaremos una clave temporal a ${email}. Tu contraseña actual seguirá funcionando hasta que completes el cambio.`}
+                </p>
+                {error && <Alert className="mt-3">{error}</Alert>}
+                <Button className="mt-4" onClick={pedirClave} loading={enviando}>
+                    <MailCheck className="size-5" aria-hidden="true" />
+                    Enviar clave temporal a mi correo
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="mt-3">
+            <Alert tone="ok" className="mb-4">
+                {aviso}
+            </Alert>
+            {error && <Alert className="mb-4">{error}</Alert>}
+            <CambiarClaveForm
+                onSuccess={onCambiada}
+                etiquetaTemporal="Clave temporal"
+                hintTemporal="Revisa tu bandeja de entrada y la carpeta de spam."
+                secondaryAction={
+                    <Button variant="secondary" onClick={pedirClave} loading={enviando} disabled={espera > 0}>
+                        {espera > 0 ? `Reenviar en ${espera} s` : 'Reenviar clave'}
+                    </Button>
+                }
+            />
+        </div>
+    )
+}
 
 export default function Profile() {
     const { user, applySession } = useAuth()
@@ -56,16 +127,16 @@ export default function Profile() {
                     </Alert>
                 ) : null}
                 {cambiando ? (
-                    <div className="mt-4">
-                        <CambiarClaveForm
-                            onSuccess={onClaveCambiada}
-                            secondaryAction={
-                                <Button variant="secondary" onClick={() => setCambiando(false)}>
-                                    Cancelar
-                                </Button>
-                            }
-                        />
-                    </div>
+                    <>
+                        <CambioDeClave email={user.email} onCambiada={onClaveCambiada} />
+                        <button
+                            type="button"
+                            onClick={() => setCambiando(false)}
+                            className="mt-4 text-sm font-bold text-ink-500 hover:text-ink-700 hover:underline"
+                        >
+                            Cancelar
+                        </button>
+                    </>
                 ) : (
                     <Button
                         variant="secondary"
