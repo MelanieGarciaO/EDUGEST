@@ -1,11 +1,13 @@
 """
 Vencimiento de la contraseña temporal de bienvenida (2 horas).
-Las cuentas que ya estaban pendientes de activar reciben un plazo de 2 horas desde ahora.
+
+La columna «clave_temporal_expira_en» ya la crea la migración 0004; esta solo da un plazo
+de 2 horas, desde ahora, a las cuentas que ya estaban pendientes de activar.
 """
 
 from datetime import timedelta
 
-from django.db import migrations, models
+from django.db import migrations
 from django.utils import timezone
 
 
@@ -20,10 +22,5 @@ class Migration(migrations.Migration):
     dependencies = [("security", "0004_codigorecuperacion_tipo_and_more")]
 
     operations = [
-        migrations.AddField(
-            model_name="user",
-            name="clave_temporal_expira_en",
-            field=models.DateTimeField(blank=True, null=True, verbose_name="la clave temporal vence el"),
-        ),
         migrations.RunPython(plazo_para_pendientes, migrations.RunPython.noop),
     ]
