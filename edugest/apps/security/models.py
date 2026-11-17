@@ -149,3 +149,37 @@ class CodigoRecuperacion(models.Model):
     @property
     def vigente(self):
         return self.usado_en is None and self.expira_en > timezone.now()
+
+
+class EnvioAcceso(models.Model):
+    """
+    Cola de envío de las contraseñas temporales de bienvenida (intermediario de la
+    importación masiva). Importar solo registra a los usuarios y los pone en esta cola; un
+    proceso aparte toma un envío a la vez, genera la clave temporal en ese momento (no se
+    guarda en ningún lado) y la manda por correo a un ritmo controlado, con reintentos.
+    """
+
+    class Estado(models.TextChoices):
+        PENDIENTE = "PENDIENTE", "En cola"
+        ENVIANDO = "ENVIANDO", "Enviando"
+        ENVIADO = "ENVIADO", "Enviado"
+        ERROR = "ERROR", "No se pudo enviar"
+        CANCELADO = "CANCELADO", "Cancelado"
+
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="envios_acceso")
+    lote = models.CharField("lote de importación", max_length=36, db_index=True)
+    estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True)
+    intentos = models.PositiveSmallIntegerField(default=0)
+    programado_en = models.DateTimeField("enviar desde", default=timezone.now, db_index=True)
+    tomado_en = models.DateTimeField(null=True, blank=True)
+    enviado_en = models.DateTimeField(null=True, blank=True)
+    ultimo_error = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["programado_en", "id"]
+        verbose_name = "envío de acceso"
+        verbose_name_plural = "cola de envíos de acceso"
+
+    def __str__(self):
+        return f"{self.usuario} · {self.get_estado_display()}"

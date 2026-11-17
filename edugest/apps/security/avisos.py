@@ -47,14 +47,14 @@ _AVISO = {
 }
 
 
-def cuenta_creada(usuario, temporal, motivo=CREADA, vence_en=None):
+def cuenta_creada(usuario, temporal, motivo=CREADA, vence_en=None, enviar_ya=False):
     """Contraseña temporal de bienvenida: al crear la cuenta, al reenviarla o al renovarla por vencida."""
     vence = timezone.localtime(vence_en).strftime("%d/%m/%Y a las %H:%M") if vence_en else ""
     detalles = [("Usuario", usuario.email)]
     if vence:
         detalles.append(("Vence", vence))
     return _notificar(
-        [usuario], tipo=motivo,
+        [usuario], tipo=motivo, enviar_ya=enviar_ya,
         titulo="¡Bienvenido a EduGest!" if motivo == CREADA else "Nueva contraseña temporal",
         mensaje="Ingresa con la contraseña temporal que te enviamos por correo y crea la tuya.",
         enlace="/cambiar-clave",

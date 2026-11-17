@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 
-from .models import User
+from .models import EnvioAcceso, User
 
 
 class CustomUserCreationForm(UserCreationForm):
@@ -54,3 +54,13 @@ class UserAdmin(DjangoUserAdmin):
             },
         ),
     )
+
+
+@admin.register(EnvioAcceso)
+class EnvioAccesoAdmin(admin.ModelAdmin):
+    """Cola de correos de acceso de las importaciones (solo lectura: no hay contraseñas guardadas)."""
+
+    list_display = ("usuario", "estado", "intentos", "programado_en", "enviado_en", "lote")
+    list_filter = ("estado",)
+    search_fields = ("usuario__email", "lote")
+    readonly_fields = [f.name for f in EnvioAcceso._meta.fields]

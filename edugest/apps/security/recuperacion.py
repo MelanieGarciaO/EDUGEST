@@ -71,10 +71,11 @@ def horas_bienvenida():
     return _ajuste("CLAVE_BIENVENIDA_HORAS", 2)
 
 
-def asignar_clave_bienvenida(usuario, motivo=avisos.CREADA):
+def asignar_clave_bienvenida(usuario, motivo=avisos.CREADA, enviar_ya=False):
     """
     Genera la contraseña temporal de bienvenida (2 horas de plazo), cierra las sesiones y la
     envía SOLO al correo del usuario. motivo: avisos.CREADA | avisos.REENVIADA | avisos.RENOVADA.
+    Devuelve la notificación del correo (con su estado si enviar_ya=True).
     """
     temporal = generate_temporary_password()
     usuario.set_password(temporal)
@@ -82,7 +83,10 @@ def asignar_clave_bienvenida(usuario, motivo=avisos.CREADA):
     usuario.clave_temporal_expira_en = timezone.now() + timezone.timedelta(hours=horas_bienvenida())
     usuario.save(update_fields=["password", "must_change_password", "clave_temporal_expira_en", "updated_at"])
     revoke_user_tokens(usuario)
-    avisos.cuenta_creada(usuario, temporal, motivo=motivo, vence_en=usuario.clave_temporal_expira_en)
+    creadas = avisos.cuenta_creada(
+        usuario, temporal, motivo=motivo, vence_en=usuario.clave_temporal_expira_en, enviar_ya=enviar_ya
+    )
+    return creadas[0] if creadas else None
 
 
 def renovar_si_vencio(usuario, temporal):

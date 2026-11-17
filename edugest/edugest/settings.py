@@ -350,6 +350,11 @@ RECUPERACION_MAX_INTENTOS = env.int("RECUPERACION_MAX_INTENTOS", default=5)
 RECUPERACION_ESPERA_SEGUNDOS = env.int("RECUPERACION_ESPERA_SEGUNDOS", default=60)
 # Plazo de la contraseña temporal de bienvenida; al vencer se envía otra al intentar ingresar.
 CLAVE_BIENVENIDA_HORAS = env.int("CLAVE_BIENVENIDA_HORAS", default=2)
+# Cola de envío de contraseñas temporales (importación masiva de usuarios).
+COLA_ACCESOS_ASINCRONA = env.bool("COLA_ACCESOS_ASINCRONA", default=True)
+COLA_ACCESOS_PAUSA_SEGUNDOS = env.float("COLA_ACCESOS_PAUSA_SEGUNDOS", default=0.6)  # ~100 correos por minuto
+COLA_ACCESOS_MAX_INTENTOS = env.int("COLA_ACCESOS_MAX_INTENTOS", default=3)
+COLA_ACCESOS_ESPERA_CUOTA = env.int("COLA_ACCESOS_ESPERA_CUOTA", default=60)  # segundos, si el servicio pide esperar
 
 # ---------------------------------------------------------------------------
 # Logging
