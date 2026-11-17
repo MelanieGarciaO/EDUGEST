@@ -65,11 +65,12 @@ function SidebarContent({ onNavigate }) {
     const noLeidas = useNoLeidas()
 
     return (
-        <div className="flex h-full flex-col">
-            <div className="bg-navy-800 px-5 py-5">
+        <div className="flex h-full min-h-0 flex-col">
+            <div className="shrink-0 bg-navy-800 px-5 py-5">
                 <Logo light />
             </div>
-            <nav aria-label="Principal" className="flex-1 space-y-1 p-3">
+            {/* Solo la lista se desplaza: el pie con «Cerrar sesión» siempre queda visible. */}
+            <nav aria-label="Principal" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
                 {navFor(user).map(({ to, label, icon: Icon, end, contador }) => (
                     <NavLink
                         key={to}
@@ -94,7 +95,7 @@ function SidebarContent({ onNavigate }) {
                     </NavLink>
                 ))}
             </nav>
-            <div className="border-t border-line p-3">
+            <div className="shrink-0 border-t border-line p-3">
                 <div className="flex items-center gap-3 px-2 py-2">
                     <Avatar user={user} />
                     <div className="min-w-0">
@@ -145,7 +146,7 @@ export default function AppLayout({ children }) {
                 Saltar al contenido
             </a>
 
-            <aside className="sticky top-0 hidden h-screen border-r border-line bg-white lg:block">
+            <aside className="sticky top-0 hidden h-dvh border-r border-line bg-white lg:block">
                 <SidebarContent />
             </aside>
 
@@ -170,7 +171,7 @@ export default function AppLayout({ children }) {
                         className="absolute inset-0 bg-navy-900/60"
                         onClick={() => setOpen(false)}
                     />
-                    <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl">
+                    <div className="absolute inset-y-0 left-0 h-dvh w-72 max-w-[85vw] bg-white shadow-xl">
                         <button
                             type="button"
                             onClick={() => setOpen(false)}
