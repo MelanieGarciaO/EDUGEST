@@ -1,14 +1,20 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth.password_validation import (
     validate_password as django_validate_password,
 )
-from rest_framework import serializers
+from django.db import IntegrityError, transaction
+from rest_framework import serializers, status
+from rest_framework.exceptions import APIException
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Role, User
 from .utils import generate_temporary_password
+
+logger = logging.getLogger(__name__)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -89,17 +95,21 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 
+class CorreoNoEnviado(APIException):
+    status_code = status.HTTP_502_BAD_GATEWAY
+    default_code = "correo_no_enviado"
+
+
 class UserCreateSerializer(serializers.ModelSerializer):
     """
-    Alta de usuarios por el administrador. Si no se envía contraseña, se genera una
-    temporal que se devuelve UNA sola vez en la respuesta.
+    Alta de usuarios por el administrador. El sistema genera una contraseña temporal y la
+    envía SOLO al correo del nuevo usuario: el administrador no la ve ni puede definirla.
+    Si el correo no se puede enviar, la cuenta no se crea (nadie podría ingresar con ella).
     """
-
-    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ("email", "first_name", "last_name", "role", "password")
+        fields = ("email", "first_name", "last_name", "role")
 
     def validate_email(self, value):
         value = value.lower()
@@ -107,31 +117,29 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ya existe un usuario con este correo.")
         return value
 
-    def validate_password(self, value):
-        if value:
-            django_validate_password(value)
-        return value
-
     def create(self, validated_data):
-        password = validated_data.pop("password", "") or None
-        self._generated_password = None
-        if password is None:
-            password = generate_temporary_password()
-            self._generated_password = password
-        usuario = User.objects.create_user(
-            password=password, must_change_password=True, **validated_data
-        )
         from . import avisos
 
-        avisos.cuenta_creada(usuario, password)  # bienvenida con la contraseña temporal
+        temporal = generate_temporary_password()
+        try:
+            with transaction.atomic():
+                usuario = User.objects.create_user(
+                    password=temporal, must_change_password=True, **validated_data
+                )
+                avisos.cuenta_creada(usuario, temporal)  # si falla, se revierte el alta
+        except IntegrityError:
+            raise serializers.ValidationError({"email": "Ya existe un usuario con este correo."}) from None
+        except Exception as exc:
+            logger.warning("No se creó la cuenta de %s: falló el correo (%s)", validated_data.get("email"), exc)
+            raise CorreoNoEnviado(
+                f"No se pudo enviar el correo con los datos de acceso a {validated_data.get('email')}, "
+                "así que la cuenta no se creó. Revisa que el correo sea correcto o la configuración "
+                "del servicio de correo e inténtalo de nuevo."
+            ) from None
         return usuario
 
     def to_representation(self, instance):
-        data = UserSerializer(instance).data
-        generated = getattr(self, "_generated_password", None)
-        if generated:
-            data["temporary_password"] = generated
-        return data
+        return UserSerializer(instance).data
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

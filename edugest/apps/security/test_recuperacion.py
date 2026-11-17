@@ -164,42 +164,52 @@ class CorreosDeCuentaTests(APITestCase):
         self.client.force_authenticate(self.admin)
         mail.outbox.clear()
 
-    def test_bienvenida_con_temporal(self):
-        res = self.post(reverse("user-list"), {"email": "nuevo@edugest.test", "first_name": "Luis",
-                                                      "last_name": "Vera", "role": Role.REPRESENTANTE}, format="json")
+    def crear(self, email="nuevo@edugest.test", rol=Role.REPRESENTANTE):
+        return self.post(reverse("user-list"), {"email": email, "first_name": "Luis", "last_name": "Vera",
+                                                "role": rol}, format="json")
+
+    def test_la_temporal_solo_llega_por_correo(self):
+        res = self.crear()
         self.assertEqual(res.status_code, 201, res.data)
+        self.assertNotIn("temporary_password", res.data)
         [correo] = mail.outbox
         self.assertEqual(correo.to, ["nuevo@edugest.test"])
-        self.assertIn(res.data["temporary_password"], correo.body)
         self.assertIn("representado", correo.body)
-
-    def test_restablecer_envia_la_temporal(self):
-        user = User.objects.create_user("doc@edugest.test", "Clave12345x", first_name="Eva", last_name="Paz",
-                                        role=Role.DOCENTE)
-        mail.outbox.clear()
-        res = self.post(reverse("user-reset-password", args=[user.id]))
-        self.assertEqual(res.status_code, 200)
-        self.assertIn(res.data["temporary_password"], mail.outbox[0].body)
+        temporal = temporal_del_correo(correo)
+        usuario = User.objects.get(email="nuevo@edugest.test")
+        self.assertTrue(usuario.check_password(temporal))
+        self.assertTrue(usuario.must_change_password)
+        # Solo correo: no queda aviso en la plataforma.
+        self.assertFalse(Notificacion.objects.filter(usuario=usuario).exists())
 
     @override_settings(EMAIL_BACKEND="apps.notifications.backends.ResendEmailBackend", RESEND_API_KEY="re_prueba")
     def test_backend_resend(self):
         with mock.patch("apps.notifications.backends.requests.post") as post:
             post.return_value.status_code = 200
-            self.post(reverse("user-list"), {"email": "x@edugest.test", "first_name": "X", "last_name": "Y",
-                                                   "role": Role.DOCENTE}, format="json")
+            self.crear("x@edugest.test", Role.DOCENTE)
         cuerpo = post.call_args.kwargs["json"]
         self.assertEqual(cuerpo["to"], ["x@edugest.test"])
         self.assertIn("<html", cuerpo["html"])
         self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer re_prueba")
 
     @override_settings(EMAIL_BACKEND="apps.notifications.backends.ResendEmailBackend", RESEND_API_KEY="re_prueba")
-    def test_error_de_resend_se_registra(self):
+    def test_si_el_correo_falla_la_cuenta_no_se_crea(self):
         with mock.patch("apps.notifications.backends.requests.post") as post:
             post.return_value.status_code = 403
             post.return_value.json.return_value = {"message": "You can only send testing emails to your own email address"}
-            res = self.post(reverse("user-list"), {"email": "x@edugest.test", "first_name": "X",
-                                                         "last_name": "Y", "role": Role.DOCENTE}, format="json")
-        self.assertEqual(res.status_code, 201)  # el alta no falla por el correo
-        n = Notificacion.objects.get(tipo="cuenta_creada")
-        self.assertEqual(n.estado_correo, Notificacion.EstadoCorreo.ERROR)
-        self.assertIn("own email address", n.error_correo)
+            with self.assertLogs("django.request", level="ERROR"):
+                res = self.crear("x@edugest.test", Role.DOCENTE)
+        self.assertEqual(res.status_code, 502)
+        self.assertIn("la cuenta no se creó", str(res.data["detail"]))
+        self.assertFalse(User.objects.filter(email="x@edugest.test").exists())
+        # Al corregir el problema se puede volver a crear con el mismo correo.
+        with override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            self.assertEqual(self.crear("x@edugest.test", Role.DOCENTE).status_code, 201)
+
+    def test_recuperacion_sirve_si_se_pierde_el_correo_de_bienvenida(self):
+        self.crear()
+        mail.outbox.clear()
+        self.client.force_authenticate(None)
+        res = self.post(reverse("recuperar-solicitar"), {"email": "nuevo@edugest.test"}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)

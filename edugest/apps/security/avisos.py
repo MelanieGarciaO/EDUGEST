@@ -1,6 +1,12 @@
 """
 Correos de la cuenta (categoría SEGURIDAD: siempre se envían, no se pueden desactivar).
-Las contraseñas temporales van SOLO en el correo; el aviso que queda en la app no las guarda.
+
+- Alta de usuario: la contraseña temporal va SOLO por correo al usuario; el administrador
+  nunca la ve y no se crea aviso en la app.
+- Cambio de contraseña: correo + aviso en la app (alerta de seguridad).
+- Recuperación con código (recuperacion.py): la temporal se muestra al propio usuario en
+  pantalla y también va por correo.
+El administrador ya no puede restablecer contraseñas: el usuario la cambia o la recupera.
 """
 
 from django.utils import timezone
@@ -26,44 +32,25 @@ def _correo(**kwargs):
 
 
 def cuenta_creada(usuario, temporal):
-    _notificar(
-        [usuario], tipo="cuenta_creada",
-        titulo="¡Bienvenido a EduGest!",
-        mensaje="Tu cuenta fue creada. Cambia la contraseña temporal en tu primer ingreso.",
-        correo=_correo(
-            asunto="Tu cuenta de EduGest está lista",
-            parrafos=[
-                f"La institución creó tu cuenta de {usuario.get_role_display().lower()} en EduGest, "
-                f"donde podrás {ROLES_INICIO.get(usuario.role, 'usar la plataforma')}.",
-                "Ingresa con tu correo y esta contraseña temporal. Al entrar, el sistema te pedirá crear una propia:",
-            ],
-            destacado=temporal,
-            detalles=[("Usuario", usuario.email)],
-            boton=("Ingresar a EduGest", "/login"),
-            nota="No compartas esta contraseña. Si no esperabas este correo, comunícate con la institución.",
-        ),
-    )
+    """
+    Bienvenida con la contraseña temporal. Va SOLO por correo (el usuario aún no puede entrar
+    a la plataforma) y se envía en el momento: si falla, lanza la excepción y la cuenta no se crea.
+    """
+    from apps.notifications.servicio import enviar_correo
 
-
-def clave_restablecida(usuario, temporal, por):
-    _notificar(
-        [usuario], tipo="clave_restablecida",
-        titulo="La administración restableció tu contraseña",
-        mensaje="Ingresa con la contraseña temporal que te enviamos por correo y crea una nueva.",
-        enlace="/cambiar-clave",
-        correo=_correo(
-            asunto="Se restableció tu contraseña",
-            parrafos=[
-                "La administración de tu institución restableció tu contraseña de EduGest. "
-                "Se cerraron tus sesiones abiertas.",
-                "Ingresa con esta contraseña temporal; el sistema te pedirá crear una nueva:",
-            ],
-            destacado=temporal,
-            detalles=[("Usuario", usuario.email), ("Fecha", timezone.localtime().strftime("%d/%m/%Y %H:%M"))],
-            boton=("Ingresar a EduGest", "/login"),
-            nota="Si no lo solicitaste, comunícate con la institución.",
-        ),
-    )
+    enviar_correo(usuario, _correo(
+        asunto="Tu cuenta de EduGest está lista",
+        parrafos=[
+            f"La institución creó tu cuenta de {usuario.get_role_display().lower()} en EduGest, "
+            f"donde podrás {ROLES_INICIO.get(usuario.role, 'usar la plataforma')}.",
+            "Ingresa con tu correo y esta contraseña temporal. Al entrar, el sistema te pedirá crear una propia:",
+        ],
+        destacado=temporal,
+        detalles=[("Usuario", usuario.email)],
+        boton=("Ingresar a EduGest", "/login"),
+        nota="No compartas esta contraseña; nadie de la institución la conoce. Si la pierdes, usa "
+        "«¿Olvidaste tu contraseña?» en la pantalla de inicio. Si no esperabas este correo, comunícate con la institución.",
+    ))
 
 
 def clave_cambiada(usuario):

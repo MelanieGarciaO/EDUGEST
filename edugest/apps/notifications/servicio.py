@@ -73,6 +73,15 @@ def _mensaje_correo(usuario, correo):
     return mensaje
 
 
+def enviar_correo(usuario, correo):
+    """
+    Envía SOLO el correo, sin aviso en la app, en el momento. Si falla, lanza la excepción
+    para que quien llama decida (p. ej. no crear la cuenta). Se usa para datos de acceso
+    que el usuario aún no puede ver en la plataforma.
+    """
+    _mensaje_correo(usuario, correo).send(fail_silently=False)
+
+
 def _enviar(pendientes):
     """pendientes: [(notificacion_id, usuario, Correo)]. Actualiza el estado de cada aviso."""
     for notificacion_id, usuario, correo in pendientes:

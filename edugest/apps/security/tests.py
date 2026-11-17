@@ -107,6 +107,10 @@ class RolePermissionTests(BaseAPITest):
 
 class UserManagementTests(BaseAPITest):
     def test_admin_crea_usuario_con_clave_temporal(self):
+        from django.core import mail
+
+        from .test_recuperacion import temporal_del_correo
+
         self.auth(self.admin)
         res = self.client.post(
             reverse("user-list"),
@@ -118,15 +122,17 @@ class UserManagementTests(BaseAPITest):
             },
         )
         self.assertEqual(res.status_code, 201)
-        self.assertIn("temporary_password", res.data)
+        self.assertNotIn("temporary_password", res.data)  # el admin no la ve
         self.assertTrue(res.data["must_change_password"])
+        [correo] = mail.outbox
+        temporal = temporal_del_correo(correo)
         self.assertEqual(res.data["email"], "nueva@edugest.test")
 
         # El nuevo usuario puede ingresar, pero queda obligado a cambiar la clave.
         self.client.credentials()
         login = self.client.post(
             reverse("login"),
-            {"email": "nueva@edugest.test", "password": res.data["temporary_password"]},
+            {"email": "nueva@edugest.test", "password": temporal},
         )
         self.assertEqual(login.status_code, 200)
         self.assertTrue(login.data["user"]["must_change_password"])
@@ -180,13 +186,25 @@ class UserManagementTests(BaseAPITest):
         res = self.client.delete(reverse("user-detail", args=[self.docente.pk]))
         self.assertEqual(res.status_code, 405)
 
-    def test_reset_de_contrasena(self):
+    def test_ya_no_existe_restablecer_contrasena(self):
+        from django.urls import NoReverseMatch
+
+        with self.assertRaises(NoReverseMatch):
+            reverse("user-reset-password", args=[self.docente.pk])
         self.auth(self.admin)
-        res = self.client.post(reverse("user-reset-password", args=[self.docente.pk]))
-        self.assertEqual(res.status_code, 200)
-        self.docente.refresh_from_db()
-        self.assertTrue(self.docente.must_change_password)
-        self.assertTrue(self.docente.check_password(res.data["temporary_password"]))
+        res = self.client.post(f"/api/security/users/{self.docente.pk}/reset-password/")
+        self.assertEqual(res.status_code, 404)
+
+    def test_el_admin_no_puede_definir_la_contrasena(self):
+        from django.core import mail
+
+        self.auth(self.admin)
+        res = self.client.post(reverse("user-list"), {"email": "p@edugest.test", "first_name": "P", "last_name": "Q",
+                                                      "role": Role.DOCENTE, "password": "ClaveDelAdmin2026"})
+        self.assertEqual(res.status_code, 201)
+        nuevo = User.objects.get(email="p@edugest.test")
+        self.assertFalse(nuevo.check_password("ClaveDelAdmin2026"))  # se ignora: la genera el sistema
+        self.assertEqual(len(mail.outbox), 1)
 
 
 class PasswordChangeTests(BaseAPITest):

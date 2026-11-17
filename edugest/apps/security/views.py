@@ -21,7 +21,7 @@ from .serializers import (
     UserSerializer,
     UserUpdateSerializer,
 )
-from .utils import generate_temporary_password, revoke_user_tokens
+from .utils import revoke_user_tokens
 
 
 class LoginView(TokenObtainPairView):
@@ -177,28 +177,6 @@ class UserViewSet(viewsets.ModelViewSet):
         user.is_active = True
         user.save(update_fields=["is_active", "updated_at"])
         return Response(UserSerializer(user).data)
-
-    @action(detail=True, methods=["post"], url_path="reset-password")
-    def reset_password(self, request, pk=None):
-        user = self.get_object()
-        if user == request.user:
-            return Response(
-                {"detail": "Para tu propia cuenta usa el cambio de contraseña."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        temporary_password = generate_temporary_password()
-        user.set_password(temporary_password)
-        user.must_change_password = True
-        user.save(update_fields=["password", "must_change_password", "updated_at"])
-        revoke_user_tokens(user)
-        avisos.clave_restablecida(user, temporary_password, por=request.user)
-        return Response(
-            {
-                "detail": "Contraseña temporal generada y enviada al correo del usuario. "
-                "Entrégala también si hace falta; no se volverá a mostrar.",
-                "temporary_password": temporary_password,
-            }
-        )
 
 
 # ---------------------------------------------------------------------------

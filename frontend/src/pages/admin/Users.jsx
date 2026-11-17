@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, KeyRound, Pencil, Plus, Search, UserCheck, UserX, Users as UsersIcon } from 'lucide-react'
+import { MailCheck, Pencil, Plus, Search, UserCheck, UserX, Users as UsersIcon } from 'lucide-react'
 
 import { api, parseApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
@@ -42,53 +42,22 @@ function IconButton({ label, onClick, children, tone }) {
     )
 }
 
-/** Muestra la contraseña temporal una sola vez, con botón para copiarla. */
-function TemporaryPassword({ data, onClose }) {
-    const [copied, setCopied] = useState(false)
-    const [prevData, setPrevData] = useState(data)
-
-    // Cada contraseña nueva empieza con el botón en "Copiar".
-    if (prevData !== data) {
-        setPrevData(data)
-        setCopied(false)
-    }
-
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(data.password)
-            setCopied(true)
-        } catch {
-            setCopied(false)
-        }
-    }
-
+/** Confirma que los datos de acceso se enviaron al correo del nuevo usuario (el admin no los ve). */
+function AccesoEnviado({ usuario, onClose }) {
     return (
-        <Modal
-            open={Boolean(data)}
-            onClose={onClose}
-            title={data?.title ?? ''}
-            footer={<Button onClick={onClose}>Listo, ya la copié</Button>}
-        >
-            {data && (
-                <>
-                    <p className="text-ink-700">
-                        <span>Entrega esta contraseña temporal a </span>
-                        <strong>{data.name}</strong>
-                        <span>. Deberá cambiarla al iniciar sesión.</span>
+        <Modal open={Boolean(usuario)} onClose={onClose} title="Usuario creado" footer={<Button onClick={onClose}>Entendido</Button>}>
+            {usuario && (
+                <div className="space-y-3 text-ink-700">
+                    <p className="flex items-start gap-2">
+                        <MailCheck className="mt-0.5 size-5 shrink-0 text-ok-600" aria-hidden="true" />
+                        <span>
+                            Enviamos la contraseña temporal de <strong>{usuario.full_name}</strong> a <strong>{usuario.email}</strong>. Al ingresar por primera vez deberá crear su propia contraseña.
+                        </span>
                     </p>
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3">
-                        <code translate="no" className="notranslate text-lg font-bold break-all text-navy-800">
-                            {data.password}
-                        </code>
-                        <Button variant="secondary" className="min-h-10 shrink-0 px-3" onClick={copy}>
-                            {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
-                            {copied ? 'Copiada' : 'Copiar'}
-                        </Button>
-                    </div>
-                    <Alert tone="warn" className="mt-4">
-                        No se volverá a mostrar. Si la pierdes, deberás generar otra.
+                    <Alert tone="warn">
+                        Por seguridad, nadie más conoce esa contraseña. Si no le llega el correo (revisa también spam), puede usar «¿Olvidaste tu contraseña?» en la pantalla de inicio.
                     </Alert>
-                </>
+                </div>
             )}
         </Modal>
     )
@@ -187,7 +156,7 @@ function UserForm({ user, isSelf, onClose, onSaved }) {
                 </SelectField>
                 {!editing && (
                     <p className="text-sm text-ink-500">
-                        Al crear el usuario se generará una contraseña temporal que verás una sola vez.
+                        Se generará una contraseña temporal y se enviará solo al correo del usuario; no se mostrará aquí. Revisa que el correo esté bien escrito.
                     </p>
                 )}
             </form>
@@ -204,8 +173,7 @@ export default function Users() {
     const [page, setPage] = useState(1)
     const [form, setForm] = useState(null) // null | { user? }
     const [toggle, setToggle] = useState(null) // usuario a activar/desactivar
-    const [reset, setReset] = useState(null) // usuario a restablecer
-    const [temp, setTemp] = useState(null) // contraseña temporal a mostrar
+    const [creado, setCreado] = useState(null) // usuario recién creado (correo enviado)
     const debounced = useDebouncedValue(search)
 
     const params = { page, search: debounced || undefined, role: role || undefined, is_active: estado || undefined }
@@ -225,15 +193,6 @@ export default function Users() {
         onSuccess: () => {
             refresh()
             setToggle(null)
-        },
-    })
-
-    const resetMutation = useMutation({
-        mutationFn: async (u) => (await api.post(`/security/users/${u.id}/reset-password/`)).data,
-        onSuccess: (data, u) => {
-            setReset(null)
-            setTemp({ title: 'Contraseña restablecida', name: `${u.first_name} ${u.last_name}`, password: data.temporary_password })
-            refresh() // muestra el chip "Clave temporal" en la lista
         },
     })
 
@@ -310,17 +269,12 @@ export default function Users() {
                                     <div className="flex items-center gap-2">
                                         <Chip tone={ROLE_TONE[u.role]}>{ROLE_LABELS[u.role]}</Chip>
                                         {!u.is_active && <Chip tone="danger">Inactivo</Chip>}
-                                        {u.is_active && u.must_change_password && <Chip tone="warn">Clave temporal</Chip>}
+                                        {u.is_active && u.must_change_password && <Chip tone="warn">Pendiente de crear su contraseña</Chip>}
                                     </div>
                                     <div className="ml-auto flex">
                                         <IconButton label={`Editar a ${u.full_name}`} onClick={() => setForm({ user: u })}>
                                             <Pencil className="size-5" aria-hidden="true" />
                                         </IconButton>
-                                        {!isSelf && u.is_active && (
-                                            <IconButton label={`Restablecer contraseña de ${u.full_name}`} onClick={() => setReset(u)}>
-                                                <KeyRound className="size-5" aria-hidden="true" />
-                                            </IconButton>
-                                        )}
                                         {!isSelf &&
                                             (u.is_active ? (
                                                 <IconButton label={`Desactivar a ${u.full_name}`} tone="danger" onClick={() => setToggle(u)}>
@@ -346,14 +300,9 @@ export default function Users() {
                     isSelf={form.user?.id === me.id}
                     onClose={() => setForm(null)}
                     onSaved={(data) => {
+                        const nuevo = !form.user
                         setForm(null)
-                        if (data.temporary_password) {
-                            setTemp({
-                                title: 'Usuario creado',
-                                name: data.full_name,
-                                password: data.temporary_password,
-                            })
-                        }
+                        if (nuevo) setCreado(data) // la contraseña solo va al correo del usuario
                     }}
                 />
             )}
@@ -378,25 +327,7 @@ export default function Users() {
                 </span>
             </ConfirmDialog>
 
-            <ConfirmDialog
-                open={Boolean(reset)}
-                title="Restablecer contraseña"
-                tone="primary"
-                confirmLabel="Generar contraseña temporal"
-                loading={resetMutation.isPending}
-                error={resetMutation.isError ? parseApiError(resetMutation.error).message : ''}
-                onConfirm={() => resetMutation.mutate(reset)}
-                onClose={() => {
-                    setReset(null)
-                    resetMutation.reset()
-                }}
-            >
-                <span>
-                    {`Se generará una contraseña temporal para ${reset?.full_name ?? ''} y se cerrarán sus sesiones abiertas. Tendrá que cambiarla al ingresar.`}
-                </span>
-            </ConfirmDialog>
-
-            <TemporaryPassword data={temp} onClose={() => setTemp(null)} />
+            <AccesoEnviado usuario={creado} onClose={() => setCreado(null)} />
         </>
     )
 }
