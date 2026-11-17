@@ -34,8 +34,12 @@ export const useUsuariosActivos = (role) =>
 export const useGrados = () => useQuery({ queryKey: ['grados'], queryFn: () => fetchAll('/academic/grados/') })
 
 /** Todos los temas y subtemas activos (para elegir el tema de un recurso). */
-export const useTemasActivos = () =>
-  useQuery({ queryKey: ['temas', 'activos'], queryFn: () => fetchAll('/academic/temas/', { is_active: 'true' }) })
+/** Temas activos. Con `propios` (docente) solo los de sus asignaturas y grados asignados. */
+export const useTemasActivos = ({ propios = false } = {}) =>
+  useQuery({
+    queryKey: ['temas', 'activos', propios ? 'propios' : 'todos'],
+    queryFn: () => fetchAll('/academic/temas/', propios ? { is_active: 'true', propios: 'true' } : { is_active: 'true' }),
+  })
 
 /** Actividades (paginadas). `params`: page, paralelo, asignatura, estudiante, vigencia, search. */
 export const useActividades = (params) =>
