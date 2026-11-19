@@ -78,6 +78,17 @@ export const FASES_ERCA = [
 ]
 export const FASE_LABEL = Object.fromEntries(FASES_ERCA.map((f) => [f.value, f.label]))
 
+/**
+ * Apoyo DUA dentro de cada fase ERCA (el ERCA ordena los momentos; el DUA da flexibilidad en
+ * cada uno). Cada fase se apoya en el principio del DUA que más le corresponde.
+ */
+export const DUA_POR_FASE = {
+    EXPERIENCIA: { campo: 'dua_experiencia', principio: 'Implicación', pregunta: '¿Cómo despertar su interés desde lo que vive?' },
+    REFLEXION: { campo: 'dua_reflexion', principio: 'Acción y expresión', pregunta: '¿Cómo puede expresar lo que entendió y lo que le costó?' },
+    CONCEPTUALIZACION: { campo: 'dua_conceptualizacion', principio: 'Representación', pregunta: '¿Cómo presentarle el concepto de varias formas?' },
+    APLICACION: { campo: 'dua_aplicacion', principio: 'Acción y expresión', pregunta: '¿Cómo practicar y demostrar lo aprendido?' },
+}
+
 /** Principios del Diseño Universal para el Aprendizaje (DUA) de cada tema del plan. */
 export const PRINCIPIOS_DUA = [
     { campo: 'dua_implicacion', titulo: 'Implicación', familia: 'Para motivarlo', pregunta: '¿Cómo motivarlo y mantener su interés?' },

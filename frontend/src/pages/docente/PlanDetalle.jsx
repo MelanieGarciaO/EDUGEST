@@ -6,7 +6,7 @@ import { ArrowLeft, Ban, CheckCircle2, Pencil, Plus, RotateCcw, Send, Sparkles, 
 import { api, fetchAll, parseApiError } from '../../api/client'
 import { PlanHeader, PlanTemas } from '../../components/PlanView'
 import { Alert, Button, ConfirmDialog, Field, Modal, PageHeader, SelectField, Spinner, TextAreaField } from '../../components/ui'
-import { ESTRATEGIAS, FASES_ERCA, NIVEL_LABEL, PRINCIPIOS_DUA } from '../../lib/format'
+import { DUA_POR_FASE, ESTRATEGIAS, FASES_ERCA, NIVEL_LABEL, PRINCIPIOS_DUA } from '../../lib/format'
 import { usePlan } from '../../lib/queries'
 
 /** Ejecuta un POST/PATCH/DELETE sobre el plan y refresca sus datos. */
@@ -117,10 +117,13 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
     )
 }
 
+// Principios generales + un apoyo por fase ERCA.
+const CAMPOS_DUA = [...PRINCIPIOS_DUA.map((p) => p.campo), ...Object.values(DUA_POR_FASE).map((d) => d.campo)]
+
 /** Edita los apoyos DUA del tema; puede pedir una sugerencia a la IA y revisarla antes de guardar. */
 function DuaModal({ tema, planId, iaDisponible, onClose }) {
     // Se monta de nuevo para cada tema (key), así el formulario arranca con sus valores.
-    const [f, setF] = useState(() => Object.fromEntries(PRINCIPIOS_DUA.map((p) => [p.campo, tema?.[p.campo] ?? ''])))
+    const [f, setF] = useState(() => Object.fromEntries(CAMPOS_DUA.map((c) => [c, tema?.[c] ?? ''])))
     const [desdeIA, setDesdeIA] = useState(false)
     const guardar = useAccion(planId, async () => {
         const body = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()]))
@@ -130,13 +133,14 @@ function DuaModal({ tema, planId, iaDisponible, onClose }) {
     const sugerir = useMutation({
         mutationFn: async () => (await api.post(`/reinforcement/temas-plan/${tema.id}/sugerir-dua/`, {}, { timeout: 180_000 })).data,
         onSuccess: (data) => {
-            setF({ dua_implicacion: data.dua.implicacion, dua_representacion: data.dua.representacion, dua_accion_expresion: data.dua.accion_expresion })
+            // La respuesta usa los nombres sin «dua_» (implicacion, experiencia…).
+            setF(Object.fromEntries(CAMPOS_DUA.map((c) => [c, data.dua[c.replace(/^dua_/, '')] ?? ''])))
             setDesdeIA(true)
         },
     })
     const err = mensaje(guardar)
     const errIA = sugerir.isError ? (sugerir.error?.response?.data?.detail ?? parseApiError(sugerir.error).message) : ''
-    const completo = PRINCIPIOS_DUA.every((p) => f[p.campo].trim().length >= 10)
+    const completo = CAMPOS_DUA.every((c) => f[c].trim().length >= 10)
 
     return (
         <Modal
@@ -155,7 +159,7 @@ function DuaModal({ tema, planId, iaDisponible, onClose }) {
         >
             <div className="space-y-4">
                 <p className="text-sm text-ink-500">
-                    Diseño Universal para el Aprendizaje: cómo motivar al estudiante, cómo presentarle el tema y cómo puede demostrar lo aprendido. La familia lo verá como «Cómo apoyar en casa».
+                    Diseño Universal para el Aprendizaje: cómo motivar al estudiante, cómo presentarle el tema y cómo puede demostrar lo aprendido, en general y en cada fase del ciclo ERCA. La familia lo verá como «Cómo apoyar en casa».
                 </p>
                 {iaDisponible && (
                     <div className="flex flex-wrap items-center gap-2">
@@ -169,6 +173,7 @@ function DuaModal({ tema, planId, iaDisponible, onClose }) {
                 {errIA && <Alert>{errIA}</Alert>}
                 {desdeIA && <Alert tone="warn">Sugerencia generada con IA: revísala y ajústala antes de guardarla.</Alert>}
                 {err && !Object.keys(err.fields).length && <Alert>{err.message}</Alert>}
+                <h3 className="pt-1 font-extrabold text-navy-800">Principios generales del tema</h3>
                 {PRINCIPIOS_DUA.map((p) => (
                     <TextAreaField
                         key={p.campo}
@@ -180,6 +185,26 @@ function DuaModal({ tema, planId, iaDisponible, onClose }) {
                         error={err?.fields[p.campo]}
                     />
                 ))}
+                <div className="border-t border-line pt-4">
+                    <h3 className="font-extrabold text-navy-800">Apoyo en cada fase del ciclo ERCA</h3>
+                    <p className="mt-0.5 text-sm text-ink-500">
+                        El ERCA ordena los momentos del aprendizaje y el DUA da flexibilidad dentro de cada uno. Se muestra junto a las actividades de esa fase.
+                    </p>
+                </div>
+                {FASES_ERCA.map((fase) => {
+                    const info = DUA_POR_FASE[fase.value]
+                    return (
+                        <TextAreaField
+                            key={info.campo}
+                            label={`${fase.letra} · ${fase.label} (${info.principio}) — ${info.pregunta}`}
+                            rows={2}
+                            maxLength={800}
+                            value={f[info.campo]}
+                            onChange={(e) => setF((x) => ({ ...x, [info.campo]: e.target.value }))}
+                            error={err?.fields[info.campo]}
+                        />
+                    )
+                })}
             </div>
         </Modal>
     )

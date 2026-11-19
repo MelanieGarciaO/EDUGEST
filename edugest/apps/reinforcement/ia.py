@@ -478,9 +478,16 @@ Redacta apoyos DUA para que un estudiante supere una dificultad en un tema, orga
 - representacion: cómo presentarle el contenido de varias formas (concreto, visual, oral, ejemplos resueltos).
 - accion_expresion: de qué formas puede demostrar lo aprendido (oral, escrita, dibujos, material), con apoyos graduales.
 
+Además, en «fases», un apoyo DUA concreto DENTRO de cada fase del ciclo ERCA (el ERCA ordena los
+momentos; el DUA da flexibilidad en cada uno), apoyado en el principio que más le corresponde:
+- experiencia (implicación): cómo despertar su interés partiendo de lo que vive o conoce.
+- reflexion (acción y expresión): cómo puede expresar lo que entendió y lo que le costó (hablando, dibujando, escribiendo).
+- conceptualizacion (representación): cómo presentarle el concepto de varias formas.
+- aplicacion (acción y expresión): cómo practicar y demostrar lo aprendido de varias formas.
+
 Reglas obligatorias:
 1. Trabaja SOLO con la asignatura, el grado y el tema indicados.
-2. Español de Ecuador, claro, en 2 a 4 oraciones por principio (máx. 600 caracteres cada uno).
+2. Español de Ecuador, claro: 2 a 4 oraciones por principio y 1 a 3 por fase (máx. 600 caracteres cada uno).
 3. Que sirva al docente y que la familia también lo entienda para apoyar en casa.
 4. Ajusta los apoyos al nivel de la dificultad y a si el estudiante es reincidente.
 5. Materiales sencillos y de bajo costo. Sin enlaces, sin nombres de personas, sin diagnósticos clínicos.
@@ -492,8 +499,18 @@ ESQUEMA_DUA = {
         "implicacion": {"type": "string"},
         "representacion": {"type": "string"},
         "accion_expresion": {"type": "string"},
+        "fases": {
+            "type": "object",
+            "properties": {
+                "experiencia": {"type": "string"},
+                "reflexion": {"type": "string"},
+                "conceptualizacion": {"type": "string"},
+                "aplicacion": {"type": "string"},
+            },
+            "required": ["experiencia", "reflexion", "conceptualizacion", "aplicacion"],
+        },
     },
-    "required": ["implicacion", "representacion", "accion_expresion"],
+    "required": ["implicacion", "representacion", "accion_expresion", "fases"],
 }
 
 
@@ -533,9 +550,14 @@ def sugerir_dua(user, tema_plan):
         datos = json.loads(texto)
     except ValueError:
         raise IAError("La IA devolvió una respuesta con formato inválido. Intenta de nuevo.") from None
+    if not isinstance(datos, dict):
+        datos = {}
+    fases = datos.get("fases") if isinstance(datos.get("fases"), dict) else {}
     dua = {}
-    for campo in ("implicacion", "representacion", "accion_expresion"):
-        valor = _limpiar(datos.get(campo) if isinstance(datos, dict) else "", 800)
+    for campo, fuente in [(c, datos) for c in ("implicacion", "representacion", "accion_expresion")] + [
+        (f, fases) for f in ("experiencia", "reflexion", "conceptualizacion", "aplicacion")
+    ]:
+        valor = _limpiar(fuente.get(campo), 800)
         if len(valor) < 20:
             raise IAError("La IA no generó una sugerencia completa. Intenta de nuevo.")
         dua[campo] = valor

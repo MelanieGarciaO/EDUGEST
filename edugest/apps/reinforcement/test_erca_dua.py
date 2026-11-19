@@ -144,6 +144,12 @@ class DuaIATests(RefuerzoBase):
             "implicacion": "Relacionar las fracciones con repartir una pizza en familia y celebrar cada logro.",
             "representacion": "Usar tiras de papel de colores y ejemplos resueltos paso a paso. Ver https://x.com",
             "accion_expresion": "Que explique en voz alta cómo repartió y dibuje las partes en su cuaderno.",
+            "fases": {
+                "experiencia": "Repartir una pizza de papel en la mesa de la cocina y preguntar cuánto toca a cada uno.",
+                "reflexion": "Que cuente o dibuje cómo repartió y en qué parte se confundió.",
+                "conceptualizacion": "Mostrar con tiras de papel que 1/2 y 2/4 ocupan lo mismo y luego escribirlo con números.",
+                "aplicacion": "Resolver repartos nuevos con frutas o galletas y explicarlos en voz alta o con un dibujo.",
+            },
         })
         parche = mock.patch.object(ia, "_llamar_modelo", return_value=(respuesta, "modelo-a"))
         self.modelo = parche.start()
@@ -153,6 +159,9 @@ class DuaIATests(RefuerzoBase):
         res = self.post(self.url)
         self.assertEqual(res.status_code, 200, res.data)
         self.assertIn("pizza", res.data["dua"]["implicacion"])
+        self.assertIn("tiras de papel", res.data["dua"]["conceptualizacion"])
+        self.assertEqual(set(res.data["dua"]), {"implicacion", "representacion", "accion_expresion",
+                                                "experiencia", "reflexion", "conceptualizacion", "aplicacion"})
         self.assertNotIn("https://", res.data["dua"]["representacion"])
         self.assertEqual(res.data["modelo"], "modelo-a")
         prompt = self.modelo.call_args.args[1]
@@ -169,6 +178,13 @@ class DuaIATests(RefuerzoBase):
         self.auth(self.doc1)
         self.post(reverse("plan-aprobar", args=[self.plan["id"]]))
         self.assertEqual(self.post(self.url).status_code, 400)
+
+    def test_respuesta_sin_apoyos_por_fase(self):
+        datos = json.loads(self.modelo.return_value[0])
+        datos["fases"]["reflexion"] = ""
+        self.modelo.return_value = (json.dumps(datos), "m")
+        with self.assertLogs("django.request", level="ERROR"):
+            self.assertEqual(self.post(self.url).status_code, 502)
 
     def test_respuesta_incompleta(self):
         self.modelo.return_value = (json.dumps({"implicacion": "corto", "representacion": "", "accion_expresion": ""}), "m")
@@ -212,3 +228,67 @@ class MigracionDatosTests(RefuerzoBase):
         self.assertEqual(fases, [E, C, A, A])  # 2 básicas + 2 intermedias, sin agregar guías
         tp = TemaPlan.objects.get(pk=tema["id"])
         self.assertIn("material concreto", tp.dua_representacion)
+
+
+class DuaPorFaseTests(RefuerzoBase):
+    """Un apoyo DUA dentro de cada fase ERCA de cada tema del plan."""
+
+    CAMPOS = ("dua_experiencia", "dua_reflexion", "dua_conceptualizacion", "dua_aplicacion")
+
+    def test_se_prellenan_las_cuatro_fases(self):
+        tema = self.plan_con({self.fracciones: "3.5"})["temas"][0]
+        for campo in self.CAMPOS:
+            self.assertGreater(len(tema[campo]), 20, campo)
+        self.assertIn("situación real de casa", tema["dua_experiencia"])
+        self.assertIn("dibujando", tema["dua_reflexion"])
+        self.assertIn("objetos o dibujos", tema["dua_conceptualizacion"])
+        self.assertIn("15 a 20 minutos", tema["dua_experiencia"])  # dificultad ALTA
+        self.assertIn("retirarlo poco a poco", tema["dua_aplicacion"])
+
+    def test_reglas_por_asignatura_reincidencia_y_motivo(self):
+        lengua = dua.sugerir_fases("Lengua y Literatura", "Idea principal", "MODERADA")
+        self.assertIn("esquema sencillo", lengua["conceptualizacion"])
+        self.assertNotIn("15 a 20 minutos", lengua["experiencia"])
+        reincidente = dua.sugerir_fases("Ciencias Naturales", "Ecosistemas", "ALTA", reincidente=True)
+        self.assertIn("qué le funcionó la vez anterior", reincidente["experiencia"])
+        self.assertIn("distinta a la que ya se usó", reincidente["conceptualizacion"])
+        manual = dua.sugerir_fases("Matemática", "Fracciones", "MANUAL", motivo="comparar fracciones.")
+        self.assertIn("Centrar la práctica en: comparar fracciones.", manual["aplicacion"])
+        self.assertEqual(set(dua.PRINCIPIO_FASE), set(dua.FASES))
+
+    def test_el_docente_edita_una_fase(self):
+        tema_id = self.plan_con({self.fracciones: "3.5"})["temas"][0]["id"]
+        self.auth(self.doc1)
+        url = reverse("tema-plan-detail", args=[tema_id])
+        res = self.client.patch(url, {"dua_reflexion": "  Que lo cuente   con sus palabras.  "}, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual((res.data["dua_reflexion"], res.data["dua_origen"]), ("Que lo cuente con sus palabras.", "DOCENTE"))
+        self.assertEqual(self.client.patch(url, {"dua_aplicacion": "corto"}, format="json").status_code, 400)
+
+    def test_la_familia_lo_ve(self):
+        plan = self.plan_con({self.fracciones: "3.5"})
+        self.auth(self.doc1)
+        self.post(reverse("plan-aprobar", args=[plan["id"]]))
+        self.auth(self.rep1)
+        tema = self.client.get(reverse("plan-detail", args=[plan["id"]])).data["temas"][0]
+        self.assertTrue(all(tema[c] for c in self.CAMPOS))
+
+    def test_migracion_prellena_planes_existentes(self):
+        import importlib
+
+        from django.db import connection
+        from django.db.migrations.loader import MigrationLoader
+
+        tema = self.plan_con({self.fracciones: "3.5"})["temas"][0]
+        TemaPlan.objects.update(**{c: "" for c in self.CAMPOS})
+        TemaPlan.objects.filter(pk=tema["id"]).update(dua_implicacion="Escrito por el docente.", dua_origen="DOCENTE")
+
+        estado = MigrationLoader(connection).project_state(("reinforcement", "0009_dua_por_fase_erca"))
+        migracion = importlib.import_module("apps.reinforcement.migrations.0009_dua_por_fase_erca")
+        migracion.prellenar(estado.apps, None)
+
+        tp = TemaPlan.objects.get(pk=tema["id"])
+        self.assertIn("situación real de casa", tp.dua_experiencia)
+        self.assertTrue(all(getattr(tp, c) for c in self.CAMPOS))
+        # No toca los principios generales ni el origen.
+        self.assertEqual((tp.dua_implicacion, tp.dua_origen), ("Escrito por el docente.", "DOCENTE"))

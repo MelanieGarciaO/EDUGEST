@@ -96,6 +96,10 @@ class TemaPlanSerializer(serializers.ModelSerializer):
             "dua_implicacion",
             "dua_representacion",
             "dua_accion_expresion",
+            "dua_experiencia",
+            "dua_reflexion",
+            "dua_conceptualizacion",
+            "dua_aplicacion",
             "dua_origen",
             "actividades",
             "nota_evaluacion",
@@ -240,13 +244,21 @@ class TemaPlanEditarSerializer(serializers.ModelSerializer):
     dua_implicacion = serializers.CharField(max_length=MAX_DUA, required=False)
     dua_representacion = serializers.CharField(max_length=MAX_DUA, required=False)
     dua_accion_expresion = serializers.CharField(max_length=MAX_DUA, required=False)
+    # Un apoyo DUA por fase del ciclo ERCA.
+    dua_experiencia = serializers.CharField(max_length=MAX_DUA, required=False)
+    dua_reflexion = serializers.CharField(max_length=MAX_DUA, required=False)
+    dua_conceptualizacion = serializers.CharField(max_length=MAX_DUA, required=False)
+    dua_aplicacion = serializers.CharField(max_length=MAX_DUA, required=False)
     dua_origen = serializers.ChoiceField(
         choices=[TemaPlan.OrigenDua.IA, TemaPlan.OrigenDua.DOCENTE], required=False
     )
 
     class Meta:
         model = TemaPlan
-        fields = ("objetivo", "dua_implicacion", "dua_representacion", "dua_accion_expresion", "dua_origen")
+        fields = (
+            "objetivo", "dua_implicacion", "dua_representacion", "dua_accion_expresion",
+            "dua_experiencia", "dua_reflexion", "dua_conceptualizacion", "dua_aplicacion", "dua_origen",
+        )
 
     def validate_objetivo(self, value):
         value = " ".join(value.split())
@@ -263,6 +275,10 @@ class TemaPlanEditarSerializer(serializers.ModelSerializer):
     validate_dua_implicacion = _dua
     validate_dua_representacion = _dua
     validate_dua_accion_expresion = _dua
+    validate_dua_experiencia = _dua
+    validate_dua_reflexion = _dua
+    validate_dua_conceptualizacion = _dua
+    validate_dua_aplicacion = _dua
 
     def validate(self, attrs):
         cambia_dua = any(k.startswith("dua_") and k != "dua_origen" for k in attrs)

@@ -84,3 +84,79 @@ def sugerir(asignatura_nombre, tema_nombre, nivel_dificultad, reincidente=False,
         "representacion": " ".join(representacion),
         "accion_expresion": " ".join(accion),
     }
+
+
+# ---------------------------------------------------------------------------
+# DUA dentro de cada fase del ciclo ERCA
+# ---------------------------------------------------------------------------
+# El ERCA ordena los momentos del aprendizaje y el DUA da flexibilidad DENTRO de cada uno.
+# Cada fase lleva un apoyo propio, apoyado en el principio del DUA que más le corresponde:
+#   Experiencia        -> Implicación (despertar el interés desde lo que vive)
+#   Reflexión          -> Acción y expresión (que exprese lo que piensa como pueda)
+#   Conceptualización  -> Representación (presentar el concepto de varias formas)
+#   Aplicación         -> Acción y expresión (que demuestre lo aprendido de varias formas)
+FASES = ("experiencia", "reflexion", "conceptualizacion", "aplicacion")
+PRINCIPIO_FASE = {
+    "experiencia": "Implicación",
+    "reflexion": "Acción y expresión",
+    "conceptualizacion": "Representación",
+    "aplicacion": "Acción y expresión",
+}
+
+FASE_EXPERIENCIA = {
+    "matematica": "Empezar con una situación real de casa donde aparezca «{tema}» (repartir comida, contar dinero, medir ingredientes) y dejarle elegir cuál usar.",
+    "lengua": "Empezar con un cuento, una noticia o un tema que le guste y conversar sobre lo que ya sabe de «{tema}».",
+    "ciencias": "Empezar observando algo real de la casa o del entorno relacionado con «{tema}» y preguntarle qué cree que pasa.",
+    "sociales": "Empezar con una historia de la familia, el barrio o la ciudad relacionada con «{tema}».",
+    "ingles": "Empezar con una canción, un juego u objetos de la casa para nombrar palabras de «{tema}».",
+    "general": "Empezar con una situación de su vida diaria relacionada con «{tema}» y dejarle elegir por dónde comenzar.",
+}
+FASE_REFLEXION = (
+    "Dejar que cuente lo que entendió y lo que le costó como prefiera: hablando, dibujando o escribiendo "
+    "pocas palabras. Ayudarle con preguntas cortas: ¿qué hiciste?, ¿dónde te confundiste?, ¿qué harías distinto?"
+)
+FASE_CONCEPTUALIZACION = {
+    "matematica": "Explicar «{tema}» primero con objetos o dibujos, luego con un ejemplo resuelto paso a paso y al final con números.",
+    "lengua": "Explicar «{tema}» leyendo un ejemplo en voz alta, resaltando las palabras clave y armando un esquema sencillo.",
+    "ciencias": "Explicar «{tema}» con imágenes, un esquema o un video corto, y aclarar las palabras nuevas con dibujos.",
+    "sociales": "Explicar «{tema}» con un mapa, una línea de tiempo o fotografías.",
+    "ingles": "Presentar las palabras de «{tema}» con imágenes, gestos y audio, repitiéndolas en voz alta.",
+    "general": "Explicar «{tema}» combinando la explicación oral con imágenes, ejemplos y un esquema.",
+}
+FASE_APLICACION = {
+    "matematica": "Practicar con ejercicios cortos y situaciones nuevas (compras, recetas, juegos); permitir que resuelva con material, con dibujos o explicando en voz alta.",
+    "lengua": "Practicar con textos nuevos; aceptar respuestas orales, dibujos o resúmenes cortos además de las escritas.",
+    "ciencias": "Aplicar lo aprendido a otra situación de la casa; puede mostrarlo con un dibujo, una maqueta sencilla o explicándolo.",
+    "sociales": "Relacionar lo aprendido con otra situación cercana; puede mostrarlo con un organizador gráfico, un dibujo o una exposición corta.",
+    "ingles": "Usar las palabras en un juego o un diálogo corto; valorar las respuestas orales y señalando imágenes.",
+    "general": "Practicar en situaciones nuevas y dejar que demuestre lo aprendido como prefiera: oral, escrito, con dibujos o con material.",
+}
+
+
+def sugerir_fases(asignatura_nombre, tema_nombre, nivel_dificultad, reincidente=False, motivo=""):
+    """Devuelve {"experiencia", "reflexion", "conceptualizacion", "aplicacion"}: un apoyo DUA por fase."""
+    clave = _clave_asignatura(asignatura_nombre)
+    datos = {"tema": tema_nombre}
+
+    experiencia = [FASE_EXPERIENCIA[clave].format(**datos)]
+    reflexion = [FASE_REFLEXION]
+    conceptualizacion = [FASE_CONCEPTUALIZACION[clave].format(**datos)]
+    aplicacion = [FASE_APLICACION[clave].format(**datos)]
+
+    if nivel_dificultad == ALTA:
+        experiencia.append("Que la actividad sea corta (15 a 20 minutos).")
+        reflexion.append("Reconocer cada avance, aunque sea pequeño.")
+        conceptualizacion.append("Presentar poca información a la vez y repetir el ejemplo con pequeñas variaciones.")
+        aplicacion.append("Dejar un ejemplo modelo a la vista al inicio y retirarlo poco a poco.")
+    if reincidente:
+        experiencia.append("Recordar juntos qué le funcionó la vez anterior.")
+        conceptualizacion.append("Probar una forma de explicación distinta a la que ya se usó.")
+    if nivel_dificultad == MANUAL and motivo:
+        aplicacion.append(f"Centrar la práctica en: {motivo.rstrip(' .')}.")
+
+    return {
+        "experiencia": " ".join(experiencia),
+        "reflexion": " ".join(reflexion),
+        "conceptualizacion": " ".join(conceptualizacion),
+        "aplicacion": " ".join(aplicacion),
+    }

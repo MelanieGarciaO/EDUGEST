@@ -1,6 +1,6 @@
 import { CheckCircle2, Circle, Clock, HeartHandshake } from 'lucide-react'
 
-import { DUA_ORIGEN_LABEL, ESTRATEGIA_LABEL, FASES_ERCA, PRINCIPIOS_DUA, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
+import { DUA_ORIGEN_LABEL, DUA_POR_FASE, ESTRATEGIA_LABEL, FASES_ERCA, PRINCIPIOS_DUA, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
 import { Card, Chip } from './ui'
 import { cx } from '../lib/cx'
 import Evidencias from './Evidencias'
@@ -126,6 +126,24 @@ function ApoyosDua({ tema: t, familia, acciones }) {
     )
 }
 
+/** Apoyo DUA dentro de una fase ERCA. Para la familia: «Cómo ayudar en esta fase». */
+function ApoyoFase({ tema: t, fase, familia }) {
+    const info = DUA_POR_FASE[fase]
+    const texto = info && t[info.campo]
+    if (!texto) return null
+    return (
+        <div className="mt-2 ml-9 flex gap-2 rounded-lg border-l-4 border-brand-300 bg-brand-50/60 px-3 py-2 text-sm">
+            <HeartHandshake className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden="true" />
+            <p className="min-w-0 text-ink-700">
+                <span className="font-bold text-brand-700">
+                    {familia ? 'Cómo ayudar en esta fase: ' : `Apoyo DUA · ${info.principio}: `}
+                </span>
+                <span className="whitespace-pre-line">{texto}</span>
+            </p>
+        </div>
+    )
+}
+
 /** Agrupa las actividades por fase ERCA, en el orden del ciclo. */
 function porFase(actividades) {
     const grupos = FASES_ERCA.map((f) => ({ ...f, actividades: actividades.filter((a) => a.fase === f.value) }))
@@ -207,6 +225,7 @@ export function PlanTemas({ plan, actions, temaActions, duaActions, familia = fa
                                         <h4 className="font-extrabold text-navy-800">{g.label}</h4>
                                         {g.descripcion && <span className="hidden text-xs text-ink-500 sm:inline">· {g.descripcion}</span>}
                                     </div>
+                                    <ApoyoFase tema={t} fase={g.value} familia={familia} />
                             <ol className="mt-1 divide-y divide-line">
                                 {g.actividades.map((a) => {
                                     const cumplida = a.estado === 'CUMPLIDA'
