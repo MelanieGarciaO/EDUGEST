@@ -403,10 +403,14 @@ def evaluar_tema(tema_plan, ahora=None):
     """
     Registra (o actualiza) el resultado de la evaluación de un tema del plan completado.
 
-    - Tema con dificultad detectada: se supera si el promedio del tema, con la nota de la
-      evaluación incluida, llega a 7,00 (la misma regla que cierra la dificultad).
-    - Tema de refuerzo manual (ya promediaba 7 o más): se supera si la nota de la
-      evaluación es de 7,00 o más.
+    El tema se supera si la nota de la evaluación de refuerzo es de 7,00 o más, tanto si
+    venía de una dificultad detectada como de un refuerzo pedido por el docente. Antes se
+    exigía que el promedio histórico llegara a 7,00, y con notas previas bajas el tema no
+    podía superarse aunque la evaluación fuera excelente. La dificultad se cierra con la
+    misma nota, porque la evaluación aprobada es el nuevo punto de partida de su promedio
+    (grades.services._notas_vigentes).
+    `promedio_final` guarda el promedio histórico del tema (con la evaluación) como dato
+    informativo para los reportes; no decide el resultado.
     Devuelve True si el tema quedó evaluado.
     """
     nota = _nota_de_evaluacion(tema_plan)
@@ -417,10 +421,7 @@ def evaluar_tema(tema_plan, ahora=None):
             estudiante_id=tema_plan.plan.estudiante_id, tema_id=nota.tema_id
         ).values_list("valor", flat=True)
         promedio = scale.promedio(valores)
-        if tema_plan.origen == TemaPlan.Origen.DIFICULTAD:
-            superado = promedio >= scale.UMBRAL_ALCANZA
-        else:
-            superado = nota.valor >= scale.UMBRAL_ALCANZA
+        superado = nota.valor >= scale.UMBRAL_ALCANZA
         mismo = tema_plan.evaluacion_id == nota.id and tema_plan.evaluado_en
         cambios = dict(
             evaluacion=nota,

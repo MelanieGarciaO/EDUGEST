@@ -71,7 +71,7 @@ class EvaluacionRefuerzoTests(RefuerzoBase):
 
     def test_evaluacion_insuficiente_permite_generar_un_nuevo_plan(self):
         self.completar()
-        self.evaluacion(7.5)  # (6 + 7,5) / 2 = 6,75
+        self.evaluacion(6.5)  # nota de la evaluación < 7
         plan = self.detalle()
         self.assertFalse(plan["temas"][0]["superado"])
         self.assertEqual(plan["evaluacion"]["resultado"], "NO_SUPERADO")
@@ -101,11 +101,49 @@ class EvaluacionRefuerzoTests(RefuerzoBase):
 
     def test_corregir_la_nota_actualiza_el_resultado(self):
         self.completar()
-        actividad = self.evaluacion(7.5)
+        actividad = self.evaluacion(6.5)
         self.assertFalse(self.detalle()["temas"][0]["superado"])
         self.evaluacion(9, actividad=actividad)  # corrección
         tema = self.detalle()["temas"][0]
         self.assertEqual((tema["superado"], tema["nota_evaluacion"], tema["promedio_final"]), (True, "9.00", "7.50"))
+        # Y al revés: bajar una evaluación aprobada vuelve a abrir el tema y la dificultad.
+        self.evaluacion(5, actividad=actividad)
+        self.assertFalse(self.detalle()["temas"][0]["superado"])
+        self.assertEqual(self.dificultad().estado, "DETECTADA")
+
+    # --- regla: se supera con la nota de la evaluación, no con el promedio histórico ---
+    def dificultad(self):
+        return Dificultad.objects.get(estudiante=self.est1, tema=self.fracciones)
+
+    def test_historial_bajo_no_impide_superar_con_una_buena_evaluacion(self):
+        self.completar()
+        self.evaluacion(3, es_evaluacion=False)  # otra nota baja: historial 6 y 3
+        self.evaluacion(8)  # promedio histórico (6 + 3 + 8) / 3 = 5,67
+        tema = self.detalle()["temas"][0]
+        self.assertEqual((tema["superado"], tema["nota_evaluacion"], tema["promedio_final"]), (True, "8.00", "5.67"))
+        self.assertEqual(self.dificultad().estado, "SUPERADA")
+        self.assertEqual(self.detalle()["evaluacion"]["resultado"], "SUPERADO")
+
+    def test_evaluacion_de_7_exacto_supera(self):
+        self.completar()
+        self.evaluacion(7)
+        self.assertTrue(self.detalle()["temas"][0]["superado"])
+
+    def test_evaluacion_reprobada_no_reinicia_el_promedio(self):
+        self.completar()
+        self.evaluacion(6.9)
+        dificultad = self.dificultad()
+        self.assertEqual((dificultad.estado, dificultad.promedio), ("DETECTADA", Decimal("6.45")))
+
+    def test_notas_despues_de_superar_cuentan_desde_la_evaluacion(self):
+        self.completar()
+        self.evaluacion(8)
+        self.evaluacion(9, es_evaluacion=False)  # desde el corte: (8 + 9) / 2 = 8,50
+        self.assertEqual((self.dificultad().estado, self.dificultad().promedio), ("SUPERADA", Decimal("8.50")))
+        self.evaluacion(2, es_evaluacion=False)  # (8 + 9 + 2) / 3 = 6,33 -> reincide
+        dificultad = self.dificultad()
+        self.assertEqual((dificultad.estado, dificultad.veces_detectada), ("DETECTADA", 2))
+        self.assertEqual(dificultad.promedio, Decimal("6.33"))
 
     def test_nota_en_un_subtema_evalua_el_tema_del_plan(self):
         self.completar()

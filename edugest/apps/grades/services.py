@@ -44,19 +44,42 @@ def verificar_calificable(actividad, hoy=None):
 # ---------------------------------------------------------------------------
 # Dificultades
 # ---------------------------------------------------------------------------
+def _notas_vigentes(estudiante_id, tema_id):
+    """
+    Notas que cuentan para el promedio del tema y si hubo un corte por refuerzo.
+
+    Una evaluación de refuerzo aprobada (nota >= 7,00) es el nuevo punto de partida: las notas
+    anteriores corresponden a lo que el estudiante ya superó con el plan y dejan de pesar.
+    Sin ese corte, un estudiante con notas previas de 4, 5 y 6 nunca podría cerrar la
+    dificultad aunque sacara 10 en la evaluación de refuerzo. Si después vuelve a bajar, el
+    promedio desde el corte lo detecta otra vez (reincidencia).
+    """
+    notas = Calificacion.objects.filter(estudiante_id=estudiante_id, tema_id=tema_id)
+    corte = (
+        notas.filter(
+            actividad__es_evaluacion_refuerzo=True,
+            actividad__estado=Actividad.Estado.PUBLICADA,
+            valor__gte=scale.UMBRAL_ALCANZA,
+        )
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    if corte is not None:
+        notas = notas.filter(created_at__gte=corte.created_at)
+    return list(notas.values_list("valor", flat=True)), corte is not None
+
+
 def recalcular_dificultad(estudiante_id, tema_id):
     """
     Recalcula, con las notas del estudiante en ese tema, si hay dificultad:
     - promedio < 7,00 -> dificultad DETECTADA (moderada o alta); si estaba superada, se reabre
       y queda como REINCIDENTE (veces_detectada + 1).
     - promedio >= 7,00 -> si estaba DETECTADA pasa a SUPERADA.
+    El promedio se toma desde la última evaluación de refuerzo aprobada, si la hay
+    (ver _notas_vigentes).
     Las notas de un subtema no cuentan para el tema padre: cada nodo se evalúa por separado.
     """
-    valores = list(
-        Calificacion.objects.filter(estudiante_id=estudiante_id, tema_id=tema_id).values_list(
-            "valor", flat=True
-        )
-    )
+    valores, hubo_corte = _notas_vigentes(estudiante_id, tema_id)
     existente = (
         Dificultad.objects.select_for_update()
         .filter(estudiante_id=estudiante_id, tema_id=tema_id)
@@ -72,7 +95,8 @@ def recalcular_dificultad(estudiante_id, tema_id):
             _emitir(dificultad_superada, existente)
         return existente
 
-    if len(valores) < minimo_calificaciones():
+    # Tras una evaluación de refuerzo aprobada basta esa nota: no se exige el mínimo otra vez.
+    if not hubo_corte and len(valores) < minimo_calificaciones():
         return existente
 
     prom = scale.promedio(valores)
