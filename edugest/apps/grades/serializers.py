@@ -187,16 +187,33 @@ class GuardarCalificacionesSerializer(serializers.Serializer):
             )
 
         validos = set(
-            Estudiante.objects.filter(
-                paralelo_id=asignacion.paralelo_id, is_active=True, id__in=ids
-            ).values_list("id", flat=True)
+            actividad.estudiantes_dirigidos().filter(id__in=ids).values_list("id", flat=True)
         )
         invalidos = sorted(set(ids) - validos)
         if invalidos:
+            if actividad.es_evaluacion_refuerzo:
+                raise serializers.ValidationError({
+                    "calificaciones": "Esta evaluación de refuerzo es solo para los estudiantes que "
+                    f"completaron su plan de refuerzo. No corresponde a: {invalidos}."
+                })
             raise serializers.ValidationError(
                 {
                     "calificaciones": "Estudiantes inexistentes, inactivos o de otro paralelo: "
                     f"{invalidos}."
                 }
             )
+        if actividad.es_evaluacion_refuerzo:
+            # La nota debe ir a un tema de su plan, para que evalúe ese refuerzo.
+            from apps.reinforcement.selectors import tema_en_plan_completado
+
+            fuera = sorted(
+                Estudiante.objects.get(pk=i).full_name
+                for i in ids
+                if not tema_en_plan_completado(i, asignacion.asignatura_id, tema)
+            )
+            if fuera:
+                raise serializers.ValidationError({
+                    "tema": f"«{tema.nombre}» no está en el plan de refuerzo completado de: "
+                    f"{', '.join(fuera)}. Elige el tema que reforzó."
+                })
         return attrs

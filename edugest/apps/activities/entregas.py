@@ -23,7 +23,6 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from apps.academic.models import Estudiante
 from apps.grades.models import Calificacion
 from apps.security.models import Role
 
@@ -85,13 +84,10 @@ def subir_entrega(actividad, usuario, estudiante_id, archivo, comentario=""):
         estudiante_id = int(estudiante_id)
     except (TypeError, ValueError):
         raise ValidationError({"estudiante": "Indica el estudiante."}) from None
-    estudiante = Estudiante.objects.filter(
-        pk=estudiante_id,
-        representante=usuario,
-        is_active=True,
-        paralelo_id=actividad.asignacion.paralelo_id,
-    ).first()
+    estudiante = actividad.estudiantes_dirigidos().filter(pk=estudiante_id, representante=usuario).first()
     if estudiante is None:
+        if actividad.es_evaluacion_refuerzo:
+            raise ValidationError({"estudiante": "Esta evaluación de refuerzo no es para este estudiante."})
         raise ValidationError({"estudiante": "El estudiante no es tu representado en este paralelo."})
     if _calificada(actividad, estudiante.id):
         raise ValidationError({"detail": "El docente ya calificó esta actividad; la entrega está cerrada."})
@@ -135,12 +131,11 @@ def _borrar(registro):
 def entregas_de(actividad, usuario):
     """
     Estado de la entrega por estudiante.
-    Docente/administrador: todos los estudiantes activos del paralelo.
+    Docente/administrador: los estudiantes a los que va la actividad (todo el paralelo o,
+    en una evaluación de refuerzo, solo sus destinatarios).
     Representante: solo sus estudiantes.
     """
-    estudiantes = Estudiante.objects.filter(
-        paralelo_id=actividad.asignacion.paralelo_id, is_active=True
-    ).order_by("last_name", "first_name")
+    estudiantes = actividad.estudiantes_dirigidos().order_by("last_name", "first_name")
     if usuario.role == Role.REPRESENTANTE:
         estudiantes = estudiantes.filter(representante=usuario)
 

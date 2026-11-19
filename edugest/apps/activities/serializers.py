@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.academic.models import Asignatura, AsignacionDocente, Paralelo
 from apps.grades import scale
+from apps.security.models import Role
 
 from . import clock
 from .models import SIN_HORA, Actividad, Extraccion
@@ -89,6 +90,25 @@ def materiales_field():
     )
 
 
+def destinatarios_de_evaluacion(asignacion):
+    """
+    Estudiantes a los que irá una evaluación de refuerzo en esa asignación. Si no hay
+    ninguno, la evaluación no se puede publicar.
+    """
+    from apps.reinforcement.selectors import estudiantes_para_evaluacion
+
+    estudiantes = list(estudiantes_para_evaluacion(asignacion.paralelo_id, asignacion.asignatura_id))
+    if not estudiantes:
+        raise serializers.ValidationError({
+            "es_evaluacion_refuerzo": (
+                f"Ningún estudiante de {asignacion.paralelo.nombre_completo} tiene un plan de refuerzo de "
+                f"{asignacion.asignatura.nombre} completado y pendiente de evaluación. La evaluación de "
+                "refuerzo es solo para quienes cumplieron el 100 % de su plan."
+            )
+        })
+    return estudiantes
+
+
 # ---------------------------------------------------------------------------
 # Lectura
 # ---------------------------------------------------------------------------
@@ -104,6 +124,7 @@ class ActividadSerializer(serializers.ModelSerializer):
     vigencia = serializers.SerializerMethodField()
     notas = serializers.SerializerMethodField()
     adjuntos = serializers.SerializerMethodField()
+    destinatarios = serializers.SerializerMethodField()
 
     class Meta:
         model = Actividad
@@ -121,6 +142,7 @@ class ActividadSerializer(serializers.ModelSerializer):
             "materiales",
             "tema",
             "es_evaluacion_refuerzo",
+            "destinatarios",
             "modalidad_entrega",
             "adjuntos",
             "estado",
@@ -134,6 +156,22 @@ class ActividadSerializer(serializers.ModelSerializer):
 
     def get_vigencia(self, obj):
         return obj.vigencia()
+
+    def get_destinatarios(self, obj):
+        """
+        Evaluación de refuerzo: a quién va dirigida. El representante solo ve a sus
+        estudiantes; en una actividad normal la lista va vacía (es para todo el paralelo).
+        """
+        if not obj.es_evaluacion_refuerzo:
+            return []
+        qs = obj.destinatarios.all()
+        request = self.context.get("request")
+        if request and request.user.role == Role.REPRESENTANTE:
+            qs = qs.filter(representante=request.user)
+        return [
+            {"id": e.id, "nombre": e.full_name}
+            for e in sorted(qs, key=lambda e: (e.last_name, e.first_name))
+        ]
 
     def get_adjuntos(self, obj):
         """PDF del docente (instrucciones, rúbrica, taller). Se descargan por la API."""
@@ -222,6 +260,8 @@ class ActividadCrearSerializer(serializers.Serializer):
                 {"extraccion": "La extracción corresponde a otro paralelo."}
             )
         attrs["asignacion"] = asignacion
+        if attrs.get("es_evaluacion_refuerzo"):
+            attrs["destinatarios"] = destinatarios_de_evaluacion(asignacion)
         return attrs
 
     def create(self, validated_data):
@@ -243,6 +283,8 @@ class ActividadCrearSerializer(serializers.Serializer):
                     texto_original=extraccion.texto_original if extraccion else "",
                     extraccion=extraccion,
                 )
+                if validated_data.get("destinatarios"):
+                    actividad.destinatarios.set(validated_data["destinatarios"])
         except IntegrityError:
             # Dos publicaciones simultáneas con la misma extracción.
             raise serializers.ValidationError(
@@ -303,6 +345,17 @@ class ActividadEditarSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "No se puede editar una actividad cuyo plazo de entrega ya venció."
             )
+        cambia_evaluacion = (
+            "es_evaluacion_refuerzo" in attrs
+            and attrs["es_evaluacion_refuerzo"] != actividad.es_evaluacion_refuerzo
+        )
+        if cambia_evaluacion:
+            if actividad.calificaciones.exists():
+                raise serializers.ValidationError({
+                    "es_evaluacion_refuerzo": "La actividad ya tiene notas: no se puede cambiar si es una evaluación de refuerzo."
+                })
+            if attrs["es_evaluacion_refuerzo"]:
+                attrs["destinatarios"] = destinatarios_de_evaluacion(actividad.asignacion)
         if "hora_entrega" in attrs:
             attrs["hora_entrega"] = attrs["hora_entrega"] or SIN_HORA
         # Se valida el resultado final: la fecha y la hora que quedarían tras la edición.
@@ -313,6 +366,10 @@ class ActividadEditarSerializer(serializers.ModelSerializer):
         return attrs
 
     def update(self, instance, validated_data):
+        destinatarios = validated_data.pop("destinatarios", None)
+        if "es_evaluacion_refuerzo" in validated_data and validated_data["es_evaluacion_refuerzo"] != instance.es_evaluacion_refuerzo:
+            # Activar: solo para quienes completaron su plan. Desactivar: vuelve a ser de todo el paralelo.
+            instance.destinatarios.set(destinatarios or [])
         if "descripcion" in validated_data:
             validated_data["descripcion"] = validated_data["descripcion"].strip()
         cambios = [

@@ -86,3 +86,14 @@ export const usePlanes = (params) =>
 
 export const usePlan = (id) =>
   useQuery({ queryKey: ['plan', id], queryFn: async () => (await api.get(`/reinforcement/planes/${id}/`)).data })
+
+/** Estudiantes que recibirían una evaluación de refuerzo (plan completado y pendiente de evaluar). */
+export function useDestinatariosEvaluacion(paralelo, asignatura, activo) {
+    return useQuery({
+        queryKey: ['evaluacion-destinatarios', paralelo, asignatura],
+        enabled: Boolean(activo && paralelo && asignatura),
+        queryFn: async () =>
+            (await api.get('/activities/actividades/evaluacion-destinatarios/', { params: { paralelo, asignatura } })).data
+                .estudiantes,
+    })
+}

@@ -224,7 +224,7 @@ export default function Calificar() {
                 <Alert tone="ok" className="mb-5 max-w-3xl">
                     <p>Evaluación de refuerzo</p>
                     <p className="mt-1 font-normal">
-                        La nota que registres en el tema evaluado cerrará los planes completados de cada estudiante: el tema se supera si la nota de esta evaluación es de 7,00 o más, y desde ahí se reinicia el promedio del tema.
+                        Solo aparecen los estudiantes que completaron su plan de refuerzo al 100 %. Elige el tema que reforzaron: la nota evalúa su plan (se supera con 7,00 o más) y cuenta en el promedio como recuperación, desde ahí se reinicia el promedio del tema.
                         {pendientes.isSuccess && (pendientes.data.count === 0 ? ' Ningún estudiante tiene planes pendientes de evaluación en esta asignatura.' : ` Estudiantes por evaluar: ${pendientes.data.count}.`)}
                     </p>
                 </Alert>
@@ -354,7 +354,7 @@ export default function Calificar() {
             <LeyendaSemaforo className="mb-3 max-w-3xl" />
             <p className="mb-2 text-sm text-ink-500">
                 {resumen.calificados} de {resumen.estudiantes} calificados
-                {resumen.promedio != null && ` · Promedio del paralelo: ${formatNota(resumen.promedio)}`}
+                {resumen.promedio != null && ` · ${esEvaluacion ? 'Promedio de la evaluación' : 'Promedio del paralelo'}: ${formatNota(resumen.promedio)}`}
                 {a.modalidad_entrega === 'APP' && !entregas.cargando ? ` · Entregas en la app: ${entregas.entregadas} de ${entregas.total}` : ''}
                 {' · Las observaciones son opcionales y las verá el representante.'}
             </p>

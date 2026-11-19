@@ -109,3 +109,35 @@ def docente_imparte_en_grado(user, asignatura_id, grado_id):
     return AsignacionDocente.objects.filter(
         docente=user, is_active=True, asignatura_id=asignatura_id, paralelo__grado_id=grado_id
     ).exists()
+
+
+def estudiantes_para_evaluacion(paralelo_id, asignatura_id):
+    """
+    Estudiantes a los que se dirige una evaluación de refuerzo: activos del paralelo, con
+    un plan de la asignatura COMPLETADO (todas sus actividades cumplidas) y con al menos un
+    tema todavía sin evaluar.
+    """
+    from apps.academic.models import Estudiante
+
+    return (
+        Estudiante.objects.filter(
+            paralelo_id=paralelo_id,
+            is_active=True,
+            planes_refuerzo__asignatura_id=asignatura_id,
+            planes_refuerzo__estado=PlanRefuerzo.Estado.COMPLETADA,
+            planes_refuerzo__temas__superado__isnull=True,
+        )
+        .distinct()
+        .order_by("last_name", "first_name")
+    )
+
+
+def tema_en_plan_completado(estudiante_id, asignatura_id, tema):
+    """True si el tema (o su tema padre) está en un plan COMPLETADO del estudiante."""
+    ids = [tema.id] + ([tema.padre_id] if tema.padre_id else [])
+    return TemaPlan.objects.filter(
+        plan__estudiante_id=estudiante_id,
+        plan__asignatura_id=asignatura_id,
+        plan__estado=PlanRefuerzo.Estado.COMPLETADA,
+        tema_id__in=ids,
+    ).exists()
