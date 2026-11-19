@@ -1,9 +1,10 @@
 import { CheckCircle2, Circle, Clock, HeartHandshake } from 'lucide-react'
 
-import { DUA_ORIGEN_LABEL, DUA_POR_FASE, ESTRATEGIA_LABEL, FASES_ERCA, PRINCIPIOS_DUA, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
+import { DUA_ORIGEN_LABEL, DUA_POR_FASE, ESTRATEGIA_LABEL, FASES_ERCA, FORMATOS, PRINCIPIOS_DUA, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
 import { Card, Chip } from './ui'
 import { cx } from '../lib/cx'
 import Evidencias from './Evidencias'
+import { FormatosChips } from './FormatosRecurso'
 
 const fecha = (iso) => new Date(iso).toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -144,6 +145,26 @@ function ApoyoFase({ tema: t, fase, familia }) {
     )
 }
 
+/**
+ * DUA · representación múltiple: qué formatos usan las actividades del tema. Con menos de dos
+ * formatos se sugiere al docente variar (la familia solo ve la lista).
+ */
+function RepresentacionTema({ actividades, familia }) {
+    const usados = FORMATOS.map((f) => f.value).filter((f) => actividades.some((a) => a.formatos?.includes(f)))
+    if (!usados.length) return null
+    return (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-bold text-ink-700">{familia ? 'Formas de trabajar el tema:' : 'Formas de representación (DUA):'}</span>
+            <FormatosChips formatos={usados} />
+            {!familia && usados.length < 2 && (
+                <span className="text-xs font-semibold text-warn-600">
+                    Solo un formato: considera agregar una actividad con otro (juego, material concreto, imágenes…).
+                </span>
+            )}
+        </div>
+    )
+}
+
 /** Agrupa las actividades por fase ERCA, en el orden del ciclo. */
 function porFase(actividades) {
     const grupos = FASES_ERCA.map((f) => ({ ...f, actividades: actividades.filter((a) => a.fase === f.value) }))
@@ -202,6 +223,7 @@ export function PlanTemas({ plan, actions, temaActions, duaActions, familia = fa
                             {t.objetivo}
                         </p>
                         <ApoyosDua tema={t} familia={familia} acciones={duaActions?.(t, plan)} />
+                        <RepresentacionTema actividades={t.actividades} familia={familia} />
                         {!familia && t.sin_recursos && t.actividades.length > 0 && (
                             <p className="mt-3 rounded-xl bg-warn-50 px-4 py-3 text-sm font-semibold text-warn-600">
                                 El banco no tenía actividades para este tema: se agregaron actividades guía del ciclo ERCA. Puedes reemplazarlas por recursos del banco o propias.
@@ -253,6 +275,7 @@ export function PlanTemas({ plan, actions, temaActions, duaActions, familia = fa
                                                         )}
                                                     </div>
                                                     <p className="mt-1 whitespace-pre-line text-sm text-ink-700">{a.instrucciones}</p>
+                                                    <FormatosChips formatos={a.formatos} className="mt-1.5" />
                                                     {cumplida && a.cumplida_en && (
                                                         <p className="mt-1 text-xs text-ok-600">
                                                             Cumplida el {fecha(a.cumplida_en)}

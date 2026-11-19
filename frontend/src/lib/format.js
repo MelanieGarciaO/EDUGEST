@@ -69,6 +69,18 @@ export const ESTRATEGIAS = [
 ]
 export const ESTRATEGIA_LABEL = Object.fromEntries(ESTRATEGIAS.map((e) => [e.value, e.label]))
 
+/** Formato del recurso: cómo se presenta (DUA · representación por distintos canales). */
+export const FORMATOS = [
+    { value: 'TEXTO', label: 'Texto o ficha' },
+    { value: 'VISUAL', label: 'Imágenes o esquemas' },
+    { value: 'AUDIO', label: 'Audio o lectura en voz alta' },
+    { value: 'VIDEO', label: 'Video' },
+    { value: 'MANIPULATIVO', label: 'Material concreto' },
+    { value: 'JUEGO', label: 'Juego' },
+    { value: 'DIGITAL', label: 'Recurso digital interactivo' },
+]
+export const FORMATO_LABEL = Object.fromEntries(FORMATOS.map((f) => [f.value, f.label]))
+
 /** Ciclo de aprendizaje ERCA (Minedec): orden en que se presentan las actividades del plan. */
 export const FASES_ERCA = [
     { value: 'EXPERIENCIA', label: 'Experiencia', letra: 'E', descripcion: 'Parte de algo que el estudiante ya vive o conoce.' },

@@ -5,6 +5,7 @@ import { ChevronDown, FileText, Lightbulb, Paperclip, RotateCcw, Sparkles, X } f
 import { api, parseApiError } from '../api/client'
 import { ESTRATEGIAS, FASES_ERCA, NIVELES, temaLabel } from '../lib/format'
 import { Alert, Button, Chip, Field, Modal, SelectField, TextAreaField } from './ui'
+import { FormatosSelector } from './FormatosRecurso'
 
 const ENDPOINT = '/reinforcement/recursos/'
 
@@ -125,6 +126,12 @@ function Propuesta({ p, onChange }) {
                     <Field label="Duración (min)" type="number" min="1" max="240" value={p.duracion_minutos} onChange={set('duracion_minutos')} error={p.errores?.duracion_minutos} />
                 </div>
                 <TextAreaField label="Instrucciones" rows={6} value={p.instrucciones} onChange={set('instrucciones')} maxLength={2000} error={p.errores?.instrucciones} />
+                <FormatosSelector
+                    value={p.formatos ?? []}
+                    onChange={(formatos) => onChange({ ...p, formatos })}
+                    error={p.errores?.formatos}
+                    hint="Propuestos por la IA; ajústalos si hace falta."
+                />
                 {p.errorGeneral && <Alert>{p.errorGeneral}</Alert>}
             </fieldset>
         </div>
@@ -202,6 +209,7 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
                     nivel: p.nivel,
                     estrategia: p.estrategia,
                     fase: p.fase ?? '',
+                    formatos: p.formatos ?? [],
                     titulo: p.titulo.trim(),
                     instrucciones: p.instrucciones.trim(),
                     duracion_minutos: p.duracion_minutos === '' ? null : Number(p.duracion_minutos),

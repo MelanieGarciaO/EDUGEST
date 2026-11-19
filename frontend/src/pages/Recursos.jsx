@@ -21,7 +21,8 @@ import {
     Spinner,
     TextAreaField,
 } from '../components/ui'
-import { ESTRATEGIA_LABEL, ESTRATEGIAS, FASE_LABEL, FASES_ERCA, NIVEL_LABEL, NIVEL_TONE, NIVELES, temaLabel } from '../lib/format'
+import { ESTRATEGIA_LABEL, ESTRATEGIAS, FASE_LABEL, FASES_ERCA, FORMATOS, NIVEL_LABEL, NIVEL_TONE, NIVELES, temaLabel } from '../lib/format'
+import { FormatosChips, FormatosSelector } from '../components/FormatosRecurso'
 import { useDebouncedValue } from '../lib/hooks'
 import { useAsignaturasActivas, useGrados, useTemasActivos } from '../lib/queries'
 
@@ -36,6 +37,7 @@ function RecursoForm({ item, temas, onClose }) {
         nivel: item?.nivel ?? '',
         estrategia: item?.estrategia ?? 'INDIVIDUAL',
         fase: item?.fase ?? '',
+        formatos: item?.formatos ?? [],
         titulo: item?.titulo ?? '',
         instrucciones: item?.instrucciones ?? '',
         duracion_minutos: item?.duracion_minutos ?? '',
@@ -64,6 +66,7 @@ function RecursoForm({ item, temas, onClose }) {
         if (!values.tema) local.tema = 'Elige el tema.'
         if (!values.nivel) local.nivel = 'Elige el nivel.'
         if (!values.estrategia) local.estrategia = 'Elige la estrategia.'
+        if (editing && !values.formatos.length) local.formatos = 'Elige al menos un formato.'
         if (!values.titulo.trim()) local.titulo = 'Escribe el título.'
         if (!values.instrucciones.trim()) local.instrucciones = 'Escribe las instrucciones para el estudiante.'
         const minutos = values.duracion_minutos === '' ? null : Number(values.duracion_minutos)
@@ -77,6 +80,7 @@ function RecursoForm({ item, temas, onClose }) {
             nivel: values.nivel,
             estrategia: values.estrategia,
             fase: values.fase,
+            formatos: values.formatos,
             titulo: values.titulo.trim(),
             instrucciones: values.instrucciones.trim(),
             duracion_minutos: minutos,
@@ -160,6 +164,16 @@ function RecursoForm({ item, temas, onClose }) {
                     maxLength={2000}
                     hint="Lo que el estudiante debe hacer en casa, explicado con claridad."
                 />
+                <FormatosSelector
+                    value={values.formatos}
+                    onChange={(formatos) => setValues((v) => ({ ...v, formatos }))}
+                    error={errors.formatos}
+                    hint={
+                        editing
+                            ? 'Cómo se presenta la actividad. Al armar el plan se prefieren formatos distintos en cada tema.'
+                            : 'Cómo se presenta la actividad. Si no eliges ninguno, se deduce de las instrucciones.'
+                    }
+                />
             </form>
         </Modal>
     )
@@ -172,6 +186,7 @@ export default function Recursos() {
     const [grado, setGrado] = useState('')
     const [asignatura, setAsignatura] = useState('')
     const [nivel, setNivel] = useState('')
+    const [formato, setFormato] = useState('')
     const [estado, setEstado] = useState('true')
     const [page, setPage] = useState(1)
     const [form, setForm] = useState(null)
@@ -190,6 +205,7 @@ export default function Recursos() {
         grado: grado || undefined,
         asignatura: asignatura || undefined,
         nivel: nivel || undefined,
+        formato: formato || undefined,
         is_active: estado || undefined,
     }
     const list = useQuery({
@@ -243,8 +259,8 @@ export default function Recursos() {
                 </Alert>
             )}
 
-            <Card className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <div className="sm:col-span-2 lg:col-span-5">
+            <Card className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                <div className="sm:col-span-2 lg:col-span-6">
                     <label htmlFor="buscar-rec" className="mb-1.5 block text-sm font-bold text-ink-700">
                         Buscar
                     </label>
@@ -284,6 +300,14 @@ export default function Recursos() {
                         </option>
                     ))}
                 </SelectField>
+                <SelectField label="Formato" value={formato} onChange={filter(setFormato)}>
+                    <option value="">Todos</option>
+                    {FORMATOS.map((f) => (
+                        <option key={f.value} value={f.value}>
+                            {f.label}
+                        </option>
+                    ))}
+                </SelectField>
                 <SelectField label="Estado" value={estado} onChange={filter(setEstado)}>
                     <option value="true">Activos</option>
                     <option value="false">Inactivos</option>
@@ -311,6 +335,7 @@ export default function Recursos() {
                                             {r.grado_nombre} · {r.asignatura_nombre} · {r.tema_nombre}
                                         </p>
                                         <p className="mt-1.5 line-clamp-2 text-sm text-ink-700">{r.instrucciones}</p>
+                                        <FormatosChips formatos={r.formatos} className="mt-2" />
                                         <p className="mt-1.5 text-xs text-ink-500">
                                             {r.duracion_minutos ? `${r.duracion_minutos} min · ` : ''}
                                             Creado por {r.creado_por_nombre ?? 'el sistema'}

@@ -8,6 +8,7 @@ import { PlanHeader, PlanTemas } from '../../components/PlanView'
 import { Alert, Button, ConfirmDialog, Field, Modal, PageHeader, SelectField, Spinner, TextAreaField } from '../../components/ui'
 import { DUA_POR_FASE, ESTRATEGIAS, FASES_ERCA, NIVEL_LABEL, PRINCIPIOS_DUA } from '../../lib/format'
 import { usePlan } from '../../lib/queries'
+import { FormatosSelector } from '../../components/FormatosRecurso'
 
 /** Ejecuta un POST/PATCH/DELETE sobre el plan y refresca sus datos. */
 function useAccion(planId, fn) {
@@ -60,7 +61,7 @@ function ObjetivoModal({ tema, planId, onClose }) {
 /** Edita una actividad existente (actividad) o agrega una propia (tema). */
 function ActividadModal({ actividad, tema, planId, onClose }) {
     const abierto = !!(actividad || tema)
-    const inicial = () => ({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION' })
+    const inicial = () => ({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION', formatos: actividad?.formatos ?? [] })
     const [f, setF] = useState(inicial)
     // Al abrir con otra actividad o tema se recarga el formulario (sin efecto).
     const [previo, setPrevio] = useState({ actividad, tema })
@@ -69,7 +70,7 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
         if (abierto) setF(inicial())
     }
     const guardar = useAccion(planId, async () => {
-        const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia, fase: f.fase }
+        const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia, fase: f.fase, formatos: f.formatos }
         return actividad
             ? (await api.patch(`/reinforcement/actividades/${actividad.id}/`, body)).data
             : (await api.post(`/reinforcement/temas-plan/${tema.id}/actividades/`, body)).data
@@ -88,7 +89,7 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
             footer={
                 <>
                     <Button variant="secondary" onClick={onClose} disabled={guardar.isPending}>Cancelar</Button>
-                    <Button loading={guardar.isPending} disabled={!f.titulo.trim() || !f.instrucciones.trim()} onClick={() => guardar.mutate(undefined, { onSuccess: onClose })}>
+                    <Button loading={guardar.isPending} disabled={!f.titulo.trim() || !f.instrucciones.trim() || (actividad && !f.formatos.length)} onClick={() => guardar.mutate(undefined, { onSuccess: onClose })}>
                         {actividad ? 'Guardar cambios' : 'Agregar actividad'}
                     </Button>
                 </>
@@ -112,6 +113,12 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
                     </SelectField>
                     <Field label="Duración (min)" type="number" min="1" max="240" value={f.duracion} onChange={set('duracion')} error={err?.fields.duracion_minutos} hint="Opcional." />
                 </div>
+                <FormatosSelector
+                    value={f.formatos}
+                    onChange={(formatos) => setF((x) => ({ ...x, formatos }))}
+                    error={err?.fields.formatos}
+                    hint={actividad ? 'Cómo se presenta la actividad.' : 'Opcional: si no eliges, se deduce de las instrucciones.'}
+                />
             </div>
         </Modal>
     )
