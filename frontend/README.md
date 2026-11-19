@@ -1,16 +1,31 @@
-# React + Vite
+# EduGest — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interfaz web de EduGest, hecha con **React + Vite**, React Router, TanStack Query y Tailwind CSS.
 
-Currently, two official plugins are available:
+La documentación completa del proyecto (funcionalidades, arquitectura, instalación y pruebas) está
+en el [README principal](../README.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Inicio rápido
 
-## React Compiler
+```bash
+npm install
+cp .env.example .env     # VITE_API_URL=http://localhost:8000/api
+npm run dev              # http://localhost:5173
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Script | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo con recarga en caliente |
+| `npm run lint` | Revisa el código con ESLint |
+| `npm run build` | Genera la versión de producción en `dist/` |
+| `npm run preview` | Sirve localmente la versión de producción |
 
-## Expanding the ESLint configuration
+## Estructura
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Carpeta | Contenido |
+|---|---|
+| `src/api/` | Cliente HTTP (JWT y renovación de token) |
+| `src/components/` | Componentes reutilizables (modales, tarjetas, semáforo, vista del plan) |
+| `src/layout/` | Estructura general: menú lateral y encabezado por rol |
+| `src/lib/` | Consultas a la API con TanStack Query y utilidades (formato de notas, fechas, roles, clases CSS) |
+| `src/pages/` | Pantallas por rol: `admin/`, `docente/`, `representante/` y `legal/` |

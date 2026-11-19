@@ -1,0 +1,105 @@
+# Integración continua de EduGest.
+# En cada push y pull request ejecuta las pruebas del backend (Django + PostgreSQL + spaCy + OCR)
+# y el lint y el build del frontend (React + Vite). Si algo falla, GitHub marca el commit en rojo.
+name: CI
+
+on:
+  push:
+    branches: [main, "mejoras/**"]
+  pull_request:
+  workflow_dispatch: # permite ejecutarlo a mano desde la pestaña Actions
+
+# Si llega un push nuevo a la misma rama, cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Django)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: edugest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: edugest
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Valores solo para CI: no son secretos reales. Los correos, la IA y Supabase no se usan
+    # en las pruebas (correo en memoria, Gemini simulado, archivos en memoria).
+    env:
+      SECRET_KEY: clave-solo-para-ci-no-usar-en-produccion
+      DEBUG: "False"
+      DB_NAME: edugest
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_SSLMODE: disable
+      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10" # la misma versión del entorno de desarrollo
+          cache: pip
+          cache-dependency-path: edugest/requirements.txt
+
+      - name: Instalar Tesseract (OCR en español)
+        run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-spa
+
+      - name: Instalar dependencias (incluye el modelo es_core_news_sm)
+        run: pip install -r requirements.txt
+
+      - name: Comprobaciones de Django
+        run: python manage.py check --fail-level WARNING
+
+      - name: Verificar que no falten migraciones
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Pruebas
+        run: python manage.py test apps --settings=edugest.test_settings --parallel 1 -v 1
+
+  frontend:
+    name: Frontend (React)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # El repositorio no versiona package-lock.json, por eso se usa npm install y no npm ci.
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Build (Vite)
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:8000/api
