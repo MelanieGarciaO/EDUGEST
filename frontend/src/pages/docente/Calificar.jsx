@@ -359,6 +359,11 @@ export default function Calificar() {
                 {' · Las observaciones son opcionales y las verá el representante.'}
             </p>
 
+            {esEvaluacion && filas.length === 0 && (
+                <Alert tone="warn" className="mb-3 max-w-3xl">
+                    Esta evaluación de refuerzo no tiene estudiantes: cuando se publicó, nadie de {a.paralelo_nombre} tenía su plan de refuerzo de {a.asignatura_nombre} completado al 100 %. No hay a quién calificar; puedes cancelarla desde Actividades y publicar otra cuando alguien complete su plan.
+                </Alert>
+            )}
             <ul className="max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
                 {filas.map((f) => {
                     const texto = valores[f.estudiante] ?? ''
