@@ -1,7 +1,8 @@
 import { CheckCircle2, Circle, Clock, HeartHandshake } from 'lucide-react'
 
 import { DUA_ORIGEN_LABEL, ESTRATEGIA_LABEL, FASES_ERCA, PRINCIPIOS_DUA, NIVEL_LABEL, NIVEL_TONE, PLAN_ESTADO_LABEL, PLAN_ESTADO_TONE, PLAN_NIVEL_LABEL, evaluacionPlan, formatNota } from '../lib/format'
-import { Card, Chip, cx } from './ui'
+import { Card, Chip } from './ui'
+import { cx } from '../lib/cx'
 import Evidencias from './Evidencias'
 
 const fecha = (iso) => new Date(iso).toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' })

@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import ErrorBoundary from '../components/ErrorBoundary'
-import { Avatar, Logo, cx } from '../components/ui'
+import { Avatar, Logo } from '../components/ui'
+import { cx } from '../lib/cx'
 import { ROLE_LABELS, homeFor } from '../lib/roles'
 
 const ADMIN_NAV = [

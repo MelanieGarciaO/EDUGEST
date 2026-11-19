@@ -24,13 +24,16 @@ function useAccion(planId, fn) {
 const mensaje = (m) => (m.isError ? parseApiError(m.error) : null)
 
 function ObjetivoModal({ tema, planId, onClose }) {
-    const [texto, setTexto] = useState('')
+    const [texto, setTexto] = useState(tema?.objetivo ?? '')
+    // Al abrir con otro tema se recarga el texto (ajuste de estado durante el render, sin efecto).
+    const [temaPrevio, setTemaPrevio] = useState(tema)
+    if (tema !== temaPrevio) {
+        setTemaPrevio(tema)
+        if (tema) setTexto(tema.objetivo)
+    }
     const guardar = useAccion(planId, async () => (await api.patch(`/reinforcement/temas-plan/${tema.id}/`, { objetivo: texto })).data)
     useEffect(() => {
-        if (tema) {
-            setTexto(tema.objetivo)
-            guardar.reset()
-        }
+        if (tema) guardar.reset()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tema])
     const err = mensaje(guardar)
@@ -57,7 +60,14 @@ function ObjetivoModal({ tema, planId, onClose }) {
 /** Edita una actividad existente (actividad) o agrega una propia (tema). */
 function ActividadModal({ actividad, tema, planId, onClose }) {
     const abierto = !!(actividad || tema)
-    const [f, setF] = useState({ titulo: '', instrucciones: '', duracion: '', estrategia: '', fase: 'APLICACION' })
+    const inicial = () => ({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION' })
+    const [f, setF] = useState(inicial)
+    // Al abrir con otra actividad o tema se recarga el formulario (sin efecto).
+    const [previo, setPrevio] = useState({ actividad, tema })
+    if (actividad !== previo.actividad || tema !== previo.tema) {
+        setPrevio({ actividad, tema })
+        if (abierto) setF(inicial())
+    }
     const guardar = useAccion(planId, async () => {
         const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia, fase: f.fase }
         return actividad
@@ -65,10 +75,7 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
             : (await api.post(`/reinforcement/temas-plan/${tema.id}/actividades/`, body)).data
     })
     useEffect(() => {
-        if (abierto) {
-            setF({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION' })
-            guardar.reset()
-        }
+        if (abierto) guardar.reset()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [actividad, tema])
     const err = mensaje(guardar)
@@ -181,6 +188,12 @@ function DuaModal({ tema, planId, iaDisponible, onClose }) {
 /** Agrega una actividad desde el banco de recursos. */
 function BancoModal({ tema, plan, onClose }) {
     const [recurso, setRecurso] = useState('')
+    // Al abrir con otro tema se limpia la selección (sin efecto).
+    const [temaPrevio, setTemaPrevio] = useState(tema)
+    if (tema !== temaPrevio) {
+        setTemaPrevio(tema)
+        if (tema) setRecurso('')
+    }
     const recursos = useQuery({
         queryKey: ['recursos-plan', plan.asignatura],
         enabled: !!tema,
@@ -188,10 +201,7 @@ function BancoModal({ tema, plan, onClose }) {
     })
     const guardar = useAccion(plan.id, async () => (await api.post(`/reinforcement/temas-plan/${tema.id}/actividades/`, { recurso: Number(recurso) })).data)
     useEffect(() => {
-        if (tema) {
-            setRecurso('')
-            guardar.reset()
-        }
+        if (tema) guardar.reset()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tema])
 

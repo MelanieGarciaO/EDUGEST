@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FileDown, FileUp, History, MessageSquareText, Save } from 'lucide-react'
@@ -141,13 +141,15 @@ export default function Calificar() {
         [pendientes.data],
     )
 
-    // Carga en los campos las notas ya registradas.
-    useEffect(() => {
-        if (!notas.data) return
+    // Carga en los campos las notas ya registradas cada vez que llegan del servidor
+    // (ajuste de estado durante el render, sin useEffect).
+    const [notasCargadas, setNotasCargadas] = useState(null)
+    if (notas.data && notas.data !== notasCargadas) {
+        setNotasCargadas(notas.data)
         setValores(Object.fromEntries(notas.data.calificaciones.map((f) => [f.estudiante, f.valor != null ? formatNota(f.valor) : ''])))
         setObservaciones(Object.fromEntries(notas.data.calificaciones.map((f) => [f.estudiante, f.observacion ?? ''])))
         setTema((t) => t || String(notas.data.calificaciones.find((f) => f.tema)?.tema ?? ''))
-    }, [notas.data])
+    }
 
     const grado = paralelos.data?.find((p) => p.id === actividad.data?.paralelo)?.grado
     const temasDeLaActividad = useMemo(
@@ -221,7 +223,7 @@ export default function Calificar() {
                 <Alert tone="ok" className="mb-5 max-w-3xl">
                     <p>Evaluación de refuerzo</p>
                     <p className="mt-1 font-normal">
-                        La nota que registres en el tema evaluado cerrará los planes completados de cada estudiante: se supera si el promedio del tema llega a 7,00 (o si la nota es de 7,00 o más en un refuerzo pedido por el docente).
+                        La nota que registres en el tema evaluado cerrará los planes completados de cada estudiante: el tema se supera si la nota de esta evaluación es de 7,00 o más, y desde ahí se reinicia el promedio del tema.
                         {pendientes.isSuccess && (pendientes.data.count === 0 ? ' Ningún estudiante tiene planes pendientes de evaluación en esta asignatura.' : ` Estudiantes por evaluar: ${pendientes.data.count}.`)}
                     </p>
                 </Alert>

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { BarChart3, MessageSquareText } from 'lucide-react'
 
-import { Alert, Card, Chip, EmptyState, PageHeader, SelectField, Spinner, cx } from '../components/ui'
+import { Alert, Card, Chip, EmptyState, PageHeader, SelectField, Spinner } from '../components/ui'
+import { cx } from '../lib/cx'
 import { LeyendaSemaforo, NivelChip } from '../components/Semaforo'
 import { formatNota, reincidenciaLabel } from '../lib/format'
 import { useDesempeno, useEstudiantes } from '../lib/queries'

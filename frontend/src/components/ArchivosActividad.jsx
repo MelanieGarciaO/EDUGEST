@@ -5,7 +5,8 @@ import { FileText, Image as ImageIcon, Paperclip, Smartphone, Trash2, Upload, Us
 import { api, parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { abrirArchivo, useEntregas } from '../lib/archivos'
-import { Button, Chip, cx } from './ui'
+import { Button, Chip } from './ui'
+import { cx } from '../lib/cx'
 
 const MAX_PDF_MB = 10
 const kb = (bytes) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`)

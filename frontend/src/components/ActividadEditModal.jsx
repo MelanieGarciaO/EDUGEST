@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { api, parseApiError } from '../api/client'
@@ -7,26 +7,37 @@ import { ModalidadEntrega } from './ArchivosActividad'
 import { MaterialesInput } from './Materiales'
 import { Alert, Button, CheckboxField, Field, Modal, TextAreaField } from './ui'
 
+const SIN_ERROR = { message: '', fields: {} }
+
+function formDesde(actividad) {
+    if (!actividad) return null
+    return {
+        descripcion: actividad.descripcion,
+        fecha_entrega: actividad.fecha_entrega,
+        hora_entrega: horaCorta(actividad.hora_entrega),
+        materiales: actividad.materiales ?? [],
+        tema: actividad.tema ?? '',
+        es_evaluacion_refuerzo: !!actividad.es_evaluacion_refuerzo,
+        modalidad_entrega: actividad.modalidad_entrega ?? 'PRESENCIAL',
+    }
+}
+
 /** Edita descripción, fecha, hora, materiales, tema y modalidad de entrega de una actividad vigente. */
 export default function ActividadEditModal({ actividad, onClose }) {
     const qc = useQueryClient()
-    const [form, setForm] = useState(null)
-    const [err, setErr] = useState({ message: '', fields: {} })
+    const [form, setForm] = useState(() => formDesde(actividad))
+    const [err, setErr] = useState(SIN_ERROR)
 
-    useEffect(() => {
+    // Al abrir con otra actividad se recarga el formulario (ajuste de estado durante el
+    // render, sin useEffect: evita un render extra con los datos anteriores).
+    const [previa, setPrevia] = useState(actividad)
+    if (actividad !== previa) {
+        setPrevia(actividad)
         if (actividad) {
-            setForm({
-                descripcion: actividad.descripcion,
-                fecha_entrega: actividad.fecha_entrega,
-                hora_entrega: horaCorta(actividad.hora_entrega),
-                materiales: actividad.materiales ?? [],
-                tema: actividad.tema ?? '',
-                es_evaluacion_refuerzo: !!actividad.es_evaluacion_refuerzo,
-                modalidad_entrega: actividad.modalidad_entrega ?? 'PRESENCIAL',
-            })
-            setErr({ message: '', fields: {} })
+            setForm(formDesde(actividad))
+            setErr(SIN_ERROR)
         }
-    }, [actividad])
+    }
 
     const save = useMutation({
         mutationFn: () => api.patch(`/activities/actividades/${actividad.id}/`, { ...form, hora_entrega: form.hora_entrega || null }),

@@ -1,5 +1,5 @@
 import { ESCALA_LOEI, infoNivel } from '../lib/format'
-import { cx } from './ui'
+import { cx } from '../lib/cx'
 
 const PUNTO = { ok: 'bg-ok-600', brand: 'bg-brand-600', warn: 'bg-warn-600', danger: 'bg-danger-600' }
 const FONDO = {

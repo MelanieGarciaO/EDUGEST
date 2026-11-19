@@ -5,7 +5,8 @@ import { formatNota } from '../lib/format'
 import { AdjuntosActividad, EntregaRepresentante } from './ArchivosActividad'
 import { MaterialesChips } from './Materiales'
 import { NivelChip } from './Semaforo'
-import { Chip, cx } from './ui'
+import { Chip } from './ui'
+import { cx } from '../lib/cx'
 
 /**
  * Tarjeta de una actividad. `children` recibe las acciones (editar, cancelar…).

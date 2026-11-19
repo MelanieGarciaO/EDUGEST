@@ -4,7 +4,8 @@ import { AlertTriangle, BookOpen, ClipboardCheck, Repeat, School, Users } from '
 import { api } from '../api/client'
 import { formatNota } from '../lib/format'
 import { NivelChip } from './Semaforo'
-import { Alert, Card, Spinner, cx } from './ui'
+import { Alert, Card, Spinner } from './ui'
+import { cx } from '../lib/cx'
 
 const pct = (n) => `${String(n).replace('.', ',')} %`
 

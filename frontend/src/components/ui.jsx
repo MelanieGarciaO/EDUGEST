@@ -1,11 +1,8 @@
 import { Children, useEffect, useId, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, Eye, EyeOff, GraduationCap, Loader2, X } from 'lucide-react'
 
+import { cx } from '../lib/cx'
 import { initials } from '../lib/roles'
-
-export function cx(...parts) {
-    return parts.filter(Boolean).join(' ')
-}
 
 export function Logo({ light = false, className }) {
     return (
