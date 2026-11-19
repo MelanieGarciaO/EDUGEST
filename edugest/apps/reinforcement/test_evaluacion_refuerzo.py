@@ -352,8 +352,8 @@ class EvaluacionSoloPlanCompletadoTests(RefuerzoBase):
             fecha_entrega=HOY, es_evaluacion_refuerzo=True,
         )
         grades_services.guardar_calificaciones(vieja, self.fracciones, [(self.est3.id, Decimal("9"))], self.doc1)
-        estado = MigrationLoader(connection).project_state(("activities", "0005_actividad_destinatarios"))
-        importlib.import_module("apps.activities.migrations.0005_actividad_destinatarios").asignar_destinatarios(
+        estado = MigrationLoader(connection).project_state(("activities", "0006_asignar_destinatarios"))
+        importlib.import_module("apps.activities.migrations.0006_asignar_destinatarios").asignar_destinatarios(
             estado.apps, None
         )
         # Marta ya tenía nota (se conserva) y Luis tiene su plan completado pendiente.
