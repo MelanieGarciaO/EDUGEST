@@ -296,24 +296,38 @@ def _almacen_evidencias():
     return storages["evidencias"]
 
 
-def _ruta_evidencia(instancia, _nombre):
+def _ruta_evidencia(instancia, nombre):
     actividad = instancia.actividad
-    return f"plan-{actividad.tema_plan.plan_id}/actividad-{actividad.id}/{uuid.uuid4().hex}.jpg"
+    extension = (nombre.rsplit(".", 1)[-1] if "." in nombre else "jpg").lower()
+    return f"plan-{actividad.tema_plan.plan_id}/actividad-{actividad.id}/{uuid.uuid4().hex}.{extension}"
 
 
 class EvidenciaActividad(models.Model):
     """
-    Foto opcional que el representante sube como evidencia de una actividad de refuerzo
-    hecha en casa. Se guarda re-codificada (JPEG, sin metadatos EXIF ni ubicación) en un
-    almacenamiento privado; solo la ven el representante y el docente del plan.
+    Evidencia opcional que el representante sube de una actividad de refuerzo hecha en casa.
+    DUA · acción y expresión: el estudiante puede demostrar lo aprendido de varias formas.
+    - FOTO: del trabajo; se re-codifica a JPEG sin metadatos EXIF ni ubicación.
+    - AUDIO: el estudiante explica con su voz (grabado en el celular o subido).
+    - TEXTO: lo que hizo o aprendió, escrito por el estudiante o su familia.
+    Los archivos van a un almacenamiento privado; solo los ven el representante y el docente del plan.
     """
+
+    class Tipo(models.TextChoices):
+        FOTO = "FOTO", "Foto"
+        AUDIO = "AUDIO", "Audio"
+        TEXTO = "TEXTO", "Texto"
 
     actividad = models.ForeignKey(
         ActividadRefuerzo, on_delete=models.CASCADE, related_name="evidencias"
     )
-    archivo = models.FileField(upload_to=_ruta_evidencia, storage=_almacen_evidencias, max_length=255)
+    tipo = models.CharField(max_length=5, choices=Tipo.choices, default=Tipo.FOTO)
+    archivo = models.FileField(
+        upload_to=_ruta_evidencia, storage=_almacen_evidencias, max_length=255, blank=True
+    )
+    tipo_contenido = models.CharField("tipo de contenido", max_length=40, blank=True, default="image/jpeg")
+    texto = models.TextField("texto", blank=True)
     comentario = models.CharField(max_length=300, blank=True)
-    tamano = models.PositiveIntegerField(help_text="Bytes del archivo guardado.")
+    tamano = models.PositiveIntegerField(default=0, help_text="Bytes del archivo guardado.")
     subida_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
 

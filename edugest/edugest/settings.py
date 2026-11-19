@@ -290,6 +290,7 @@ else:
 
 EVIDENCIA_MAX_MB = env.int("EVIDENCIA_MAX_MB", default=8)
 EVIDENCIAS_POR_ACTIVIDAD = env.int("EVIDENCIAS_POR_ACTIVIDAD", default=3)
+EVIDENCIA_AUDIO_MAX_MB = env.int("EVIDENCIA_AUDIO_MAX_MB", default=5)  # ~5 min de voz
 
 # Archivos de actividades: PDF del docente y entregas del representante (imágenes o PDF).
 ADJUNTO_MAX_MB = env.int("ADJUNTO_MAX_MB", default=10)

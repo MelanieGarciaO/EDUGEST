@@ -47,7 +47,10 @@ class EvidenciaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EvidenciaActividad
-        fields = ("id", "actividad", "comentario", "tamano", "subida_por", "subida_por_nombre", "created_at")
+        fields = (
+            "id", "actividad", "tipo", "tipo_contenido", "texto", "comentario", "tamano",
+            "subida_por", "subida_por_nombre", "created_at",
+        )
         read_only_fields = fields
 
 

@@ -3,7 +3,7 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
@@ -268,7 +268,8 @@ class ActividadRefuerzoViewSet(viewsets.GenericViewSet):
       POST   /{id}/cumplir/  (docente o representante, plan aprobado) marca como cumplida
       POST   /{id}/reabrir/  (solo docente) corrige un cumplimiento marcado por error
       GET    /{id}/evidencias/  (docente o representante) fotos de la actividad
-      POST   /{id}/evidencias/  (representante, multipart «archivo» + «comentario») sube una foto
+      POST   /{id}/evidencias/  (representante) sube una evidencia: «tipo» FOTO o AUDIO con
+                                 «archivo», o TEXTO con «texto»; «comentario» opcional
     """
 
     serializer_class = ActividadRefuerzoSerializer
@@ -311,7 +312,8 @@ class ActividadRefuerzoViewSet(viewsets.GenericViewSet):
         actividad = self.get_object()
         if request.method == "POST":
             evidencias.subir(
-                actividad, request.user, request.FILES.get("archivo"), request.data.get("comentario", "")
+                actividad, request.user, request.FILES.get("archivo"), request.data.get("comentario", ""),
+                tipo=request.data.get("tipo", "FOTO"), texto=request.data.get("texto", ""),
             )
             actividad = self.get_queryset().get(pk=actividad.pk)
             return Response(
@@ -337,10 +339,10 @@ class AlertaTempranaView(APIView):
 
 class EvidenciaViewSet(viewsets.GenericViewSet):
     """
-    Evidencias fotográficas (mejora 14).
-      GET    /{id}/archivo/  (docente o representante del plan) entrega la foto
+    Evidencias (mejora 14): foto, audio o texto.
+      GET    /{id}/archivo/  (docente o representante del plan) entrega la foto o el audio
       DELETE /{id}/          (quien la subió, plan en curso) la elimina
-    Las fotos nunca tienen URL pública: se entregan solo por aquí, con autenticación.
+    Los archivos nunca tienen URL pública: se entregan solo por aquí, con autenticación.
     """
 
     serializer_class = EvidenciaSerializer
@@ -360,7 +362,11 @@ class EvidenciaViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=["get"])
     def archivo(self, request, pk=None):
         evidencia = self.get_object()
-        respuesta = FileResponse(evidencia.archivo.open("rb"), content_type="image/jpeg")
+        if not evidencia.archivo:
+            raise NotFound("Esta evidencia es de texto: no tiene archivo.")
+        respuesta = FileResponse(
+            evidencia.archivo.open("rb"), content_type=evidencia.tipo_contenido or "image/jpeg"
+        )
         respuesta["Cache-Control"] = "private, max-age=300"
         respuesta["X-Content-Type-Options"] = "nosniff"
         return respuesta
