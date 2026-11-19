@@ -42,19 +42,30 @@ def _seleccionar_recursos(tema, nivel, ya_asignados):
     """
     Elige actividades del banco para un tema según `rules`. Busca primero en el tema exacto
     y, si no hay nada y es un subtema, en su tema padre. Dentro de cada nivel prefiere los
-    recursos que el estudiante aún no ha recibido.
+    recursos que el estudiante aún no ha recibido y, entre ellos, los de un formato que el
+    tema todavía no tiene (representación múltiple del DUA).
     """
     regla = rules.ACTIVIDADES_POR_DIFICULTAD[nivel]
     candidatos = [tema] + ([tema.padre] if tema.padre_id else [])
 
     for candidato in candidatos:
-        elegidos = []
+        elegidos, cubiertos = [], set()
         for nivel_actividad, cantidad in regla.items():
-            del_nivel = RecursoRefuerzo.objects.filter(
-                tema=candidato, nivel=nivel_actividad, is_active=True
-            ).order_by("id")
-            ordenados = sorted(del_nivel, key=lambda r: (r.id in ya_asignados, r.id))
-            elegidos.extend(ordenados[:cantidad])
+            disponibles = list(
+                RecursoRefuerzo.objects.filter(
+                    tema=candidato, nivel=nivel_actividad, is_active=True
+                ).order_by("id")
+            )
+            for _ in range(min(cantidad, len(disponibles))):
+                # 1.º lo que aún no recibió; 2.º un formato nuevo para el tema (DUA:
+                # representación múltiple); 3.º el más antiguo.
+                mejor = min(
+                    disponibles,
+                    key=lambda r: (r.id in ya_asignados, not (set(r.formatos) - cubiertos), r.id),
+                )
+                disponibles.remove(mejor)
+                elegidos.append(mejor)
+                cubiertos.update(mejor.formatos)
         if elegidos:
             return elegidos
     return []
@@ -162,6 +173,7 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
                     duracion_minutos=recurso.duracion_minutos,
                     nivel=recurso.nivel,
                     estrategia=recurso.estrategia,
+                    formatos=list(recurso.formatos),
                     fase=fase,
                     orden=posicion,
                 )
@@ -232,7 +244,8 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
 # ---------------------------------------------------------------------------
 @transaction.atomic
 def agregar_actividad(
-    tema_plan, *, recurso=None, titulo=None, instrucciones=None, duracion_minutos=None, estrategia="", fase=""
+    tema_plan, *, recurso=None, titulo=None, instrucciones=None, duracion_minutos=None, estrategia="", fase="",
+    formatos=None,
 ):
     plan = tema_plan.plan
     verificar_editable(plan)
@@ -263,6 +276,7 @@ def agregar_actividad(
             duracion_minutos=recurso.duracion_minutos,
             nivel=recurso.nivel,
             estrategia=recurso.estrategia,
+            formatos=list(recurso.formatos),
             fase=fase or recurso.fase or erca.fase_por_nivel(recurso.nivel),
             orden=siguiente,
         )
@@ -274,6 +288,7 @@ def agregar_actividad(
         instrucciones=instrucciones,
         duracion_minutos=duracion_minutos,
         estrategia=estrategia or "",
+        formatos=formatos or [],  # vacío: se deduce del texto al guardar
         fase=fase or FaseErca.APLICACION,
         orden=siguiente,
     )

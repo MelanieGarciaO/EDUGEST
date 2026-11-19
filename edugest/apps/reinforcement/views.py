@@ -41,7 +41,7 @@ class RecursoViewSet(viewsets.ModelViewSet):
     Banco de recursos de refuerzo (docentes en sus asignaturas y grados, y administrador).
     Todos los docentes de una asignatura y grado ven el banco completo, pero solo el autor
     (o el administrador) edita un recurso. No hay borrado: se desactiva con is_active.
-    Filtros: ?tema= ?asignatura= ?grado= ?nivel= ?estrategia= ?is_active= ?search=
+    Filtros: ?tema= ?asignatura= ?grado= ?nivel= ?estrategia= ?formato= ?is_active= ?search=
     """
 
     serializer_class = RecursoSerializer
@@ -61,6 +61,13 @@ class RecursoViewSet(viewsets.ModelViewSet):
             if nivel not in NivelActividad.values:
                 raise ValidationError({"nivel": "Valores válidos: BASICO, INTERMEDIO, AVANZADO."})
             qs = qs.filter(nivel=nivel)
+        formato = params.get("formato")
+        if formato:
+            from .formatos import FormatoRecurso
+
+            if formato not in FormatoRecurso.values:
+                raise ValidationError({"formato": "Formato no válido."})
+            qs = qs.filter(formatos__contains=[formato])
         estrategia = params.get("estrategia")
         if estrategia:
             estrategia = estrategia.upper()

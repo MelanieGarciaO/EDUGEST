@@ -21,6 +21,26 @@ from .models import (
 # ---------------------------------------------------------------------------
 # Lectura de planes
 # ---------------------------------------------------------------------------
+
+def campo_formatos():
+    """Formatos del recurso (DUA · representación): lista de FormatoRecurso, sin repetir."""
+    from .formatos import MAX_FORMATOS, FormatoRecurso
+
+    return serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=FormatoRecurso.choices, error_messages={"invalid_choice": "«{input}» no es un formato válido."}
+        ),
+        max_length=MAX_FORMATOS,
+        required=False,
+        error_messages={"max_length": f"Elige como máximo {MAX_FORMATOS} formatos."},
+    )
+
+
+def _limpiar_formatos(value):
+    from .formatos import limpiar
+
+    return limpiar(value)
+
 class EvidenciaSerializer(serializers.ModelSerializer):
     subida_por_nombre = serializers.CharField(source="subida_por.full_name", read_only=True)
     subida_por = serializers.IntegerField(source="subida_por_id", read_only=True)
@@ -48,6 +68,7 @@ class ActividadRefuerzoSerializer(serializers.ModelSerializer):
             "duracion_minutos",
             "nivel",
             "estrategia",
+            "formatos",
             "fase",
             "orden",
             "estado",
@@ -308,6 +329,10 @@ class AgregarActividadSerializer(serializers.Serializer):
         choices=EstrategiaRefuerzo.choices, required=False, allow_blank=True
     )
     fase = serializers.ChoiceField(choices=FaseErca.choices, required=False, allow_blank=True)
+    formatos = campo_formatos()  # vacío: se deduce del texto
+
+    def validate_formatos(self, value):
+        return _limpiar_formatos(value)
 
     def validate(self, attrs):
         if "recurso" not in attrs:
@@ -330,10 +355,16 @@ class ActividadRefuerzoEditarSerializer(serializers.ModelSerializer):
     )
 
     fase = serializers.ChoiceField(choices=FaseErca.choices, required=False)
+    formatos = campo_formatos()
 
     class Meta:
         model = ActividadRefuerzo
-        fields = ("titulo", "instrucciones", "duracion_minutos", "estrategia", "fase")
+        fields = ("titulo", "instrucciones", "duracion_minutos", "estrategia", "fase", "formatos")
+
+    def validate_formatos(self, value):
+        if not value:
+            raise serializers.ValidationError("Elige al menos un formato.")
+        return _limpiar_formatos(value)
 
     def validate_titulo(self, value):
         value = " ".join(value.split())
@@ -359,6 +390,7 @@ class RecursoSerializer(serializers.ModelSerializer):
         source="creado_por.full_name", read_only=True, allow_null=True
     )
     instrucciones = serializers.CharField(max_length=2000)
+    formatos = campo_formatos()
 
     class Meta:
         model = RecursoRefuerzo
@@ -373,6 +405,7 @@ class RecursoSerializer(serializers.ModelSerializer):
             "nivel",
             "estrategia",
             "fase",
+            "formatos",
             "titulo",
             "instrucciones",
             "duracion_minutos",
@@ -390,6 +423,12 @@ class RecursoSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("El título no puede estar vacío.")
         return value
+
+    def validate_formatos(self, value):
+        # Al crear puede ir vacío (se deduce del texto); al editar debe quedar al menos uno.
+        if not value and self.instance is not None:
+            raise serializers.ValidationError("Elige al menos un formato.")
+        return _limpiar_formatos(value)
 
     def validate(self, attrs):
         inst = self.instance

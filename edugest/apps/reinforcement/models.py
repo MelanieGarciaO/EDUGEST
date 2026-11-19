@@ -56,6 +56,9 @@ class RecursoRefuerzo(models.Model):
     )
     # Opcional en el banco: si está vacía, las reglas la asignan al armar el plan (erca.py).
     fase = models.CharField("fase ERCA", max_length=20, choices=FaseErca.choices, blank=True)
+    # Cómo se presenta (DUA · representación): texto, imágenes, audio, video, material, juego...
+    # Lista de valores de formatos.FormatoRecurso. Si queda vacía se deduce del texto al guardar.
+    formatos = models.JSONField("formatos", default=list, blank=True)
     titulo = models.CharField("título", max_length=200)
     instrucciones = models.TextField("instrucciones")
     duracion_minutos = models.PositiveSmallIntegerField(
@@ -84,6 +87,14 @@ class RecursoRefuerzo(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["tema", "titulo"], name="unique_recurso_por_tema_y_titulo")
         ]
+
+    def save(self, *args, **kwargs):
+        # Sin formato indicado (semillas, cargas antiguas): se deduce del texto.
+        if not self.formatos:
+            from .formatos import inferir
+
+            self.formatos = inferir(self.titulo, self.instrucciones)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.titulo} ({self.get_nivel_display()})"
@@ -249,6 +260,7 @@ class ActividadRefuerzo(models.Model):
     nivel = models.CharField(max_length=10, choices=NivelActividad.choices, blank=True)
     estrategia = models.CharField(max_length=15, choices=EstrategiaRefuerzo.choices, blank=True)
     fase = models.CharField("fase ERCA", max_length=20, choices=FaseErca.choices, blank=True)
+    formatos = models.JSONField("formatos", default=list, blank=True)  # copiados del recurso
     orden = models.PositiveSmallIntegerField(default=0)
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True
@@ -264,6 +276,14 @@ class ActividadRefuerzo(models.Model):
         verbose_name = "actividad de refuerzo"
         verbose_name_plural = "actividades de refuerzo"
         ordering = ["orden", "id"]
+
+    def save(self, *args, **kwargs):
+        # Sin formato indicado (semillas, cargas antiguas): se deduce del texto.
+        if not self.formatos:
+            from .formatos import inferir
+
+            self.formatos = inferir(self.titulo, self.instrucciones)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.titulo
