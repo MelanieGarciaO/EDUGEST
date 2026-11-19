@@ -8,11 +8,13 @@ from .signals import actividad_cancelada
 
 @admin.register(Actividad)
 class ActividadAdmin(admin.ModelAdmin):
-    list_display = ("id", "asignacion", "fecha_entrega", "estado", "creada_por")
-    list_filter = ("estado", "asignacion__paralelo", "asignacion__asignatura")
+    list_display = ("id", "asignacion", "fecha_entrega", "estado", "es_evaluacion_refuerzo", "creada_por")
+    list_filter = ("estado", "es_evaluacion_refuerzo", "asignacion__paralelo", "asignacion__asignatura")
     search_fields = ("descripcion", "tema")
     date_hierarchy = "fecha_entrega"
     raw_id_fields = ("asignacion", "creada_por", "extraccion")
+    # En una evaluación de refuerzo: a quién va dirigida (los que completaron su plan).
+    filter_horizontal = ("destinatarios",)
     readonly_fields = ("texto_original", "created_at", "updated_at", "cancelada_en")
     actions = ("cancelar_actividades", "publicar_actividades")
 

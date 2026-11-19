@@ -77,6 +77,13 @@ export default function DocenteActividades() {
                                 </Button>
                             </>
                         )}
+                        {/* Evaluación de refuerzo vencida sin nadie a quien calificar: solo se puede cancelar. */}
+                        {a.vigencia === 'finalizada' && a.es_evaluacion_refuerzo && !a.destinatarios?.length && (
+                            <Button variant="danger" className="min-h-10" onClick={() => { cancel.reset(); setCancelling(a) }} aria-label={`Cancelar actividad de ${a.asignatura_nombre}`}>
+                                <Ban className="size-4" aria-hidden="true" />
+                                Cancelar actividad
+                            </Button>
+                        )}
                         {a.vigencia === 'finalizada' && (
                             <Button variant="ok" className="min-h-10" onClick={() => navigate(`/docente/actividades/${a.id}/calificar`)} aria-label={`Calificar actividad de ${a.asignatura_nombre}`}>
                                 <Star className="size-4" aria-hidden="true" />
