@@ -118,3 +118,18 @@ export function evaluacionPlan(ev) {
         ? { label: 'Refuerzo superado', tone: 'ok' }
         : { label: 'Refuerzo no superado', tone: 'danger' }
 }
+
+/** Valida el enlace en el navegador con las mismas reglas que el servidor (aviso rápido). */
+export function errorEnlace(valor) {
+    const enlace = (valor ?? '').trim()
+    if (!enlace) return ''
+    if (/\s/.test(enlace)) return 'El enlace no puede tener espacios.'
+    let url
+    try {
+        url = new URL(enlace)
+    } catch {
+        return 'El enlace no es válido.'
+    }
+    if (url.protocol !== 'https:') return 'Usa un enlace seguro que empiece con https://'
+    return ''
+}

@@ -1,4 +1,4 @@
-import { BookOpenText, Gamepad2, Hand, Headphones, Image, MonitorSmartphone, Video } from 'lucide-react'
+import { BookOpenText, ExternalLink, Gamepad2, Hand, Headphones, Image, MonitorSmartphone, Video } from 'lucide-react'
 import { cx } from '../lib/cx'
 import { FORMATO_LABEL, FORMATOS } from '../lib/format'
 
@@ -73,5 +73,49 @@ export function FormatosSelector({ value, onChange, error, hint, max = 4 }) {
                 hint && <p className="mt-1.5 text-sm text-ink-500">{hint}</p>
             )}
         </fieldset>
+    )
+}
+
+/** Texto del botón según el formato: «Ver video», «Escuchar audio»… */
+function accionEnlace(formatos = []) {
+    if (formatos.includes('VIDEO')) return { texto: 'Ver video', Icono: Video }
+    if (formatos.includes('AUDIO')) return { texto: 'Escuchar audio', Icono: Headphones }
+    if (formatos.includes('DIGITAL')) return { texto: 'Abrir recurso digital', Icono: MonitorSmartphone }
+    return { texto: 'Abrir enlace', Icono: ExternalLink }
+}
+
+function dominio(url) {
+    try {
+        return new URL(url).hostname.replace(/^www\./, '')
+    } catch {
+        return ''
+    }
+}
+
+/**
+ * Botón que abre el video, audio o recurso digital en otra pestaña (sin compartir datos de
+ * la app: noopener + noreferrer). A la familia se le recuerda revisar el contenido.
+ */
+export function EnlaceRecurso({ enlace, formatos, familia, className }) {
+    if (!enlace) return null
+    const { texto, Icono } = accionEnlace(formatos)
+    return (
+        <div className={cx('flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
+            <a
+                href={enlace}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand-300 bg-brand-50 px-3 text-sm font-bold text-brand-700 hover:bg-brand-100"
+            >
+                <Icono className="size-4" aria-hidden="true" />
+                {texto}
+                <ExternalLink className="size-3.5 opacity-70" aria-hidden="true" />
+                <span className="sr-only">(se abre en otra pestaña)</span>
+            </a>
+            <span className="text-xs text-ink-500">
+                {dominio(enlace)}
+                {familia ? ' · Revisa el contenido antes de compartirlo con el estudiante.' : ''}
+            </span>
+        </div>
     )
 }

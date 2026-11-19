@@ -21,8 +21,8 @@ import {
     Spinner,
     TextAreaField,
 } from '../components/ui'
-import { ESTRATEGIA_LABEL, ESTRATEGIAS, FASE_LABEL, FASES_ERCA, FORMATOS, NIVEL_LABEL, NIVEL_TONE, NIVELES, temaLabel } from '../lib/format'
-import { FormatosChips, FormatosSelector } from '../components/FormatosRecurso'
+import { errorEnlace, ESTRATEGIA_LABEL, ESTRATEGIAS, FASE_LABEL, FASES_ERCA, FORMATOS, NIVEL_LABEL, NIVEL_TONE, NIVELES, temaLabel } from '../lib/format'
+import { EnlaceRecurso, FormatosChips, FormatosSelector } from '../components/FormatosRecurso'
 import { useDebouncedValue } from '../lib/hooks'
 import { useAsignaturasActivas, useGrados, useTemasActivos } from '../lib/queries'
 
@@ -38,6 +38,7 @@ function RecursoForm({ item, temas, onClose }) {
         estrategia: item?.estrategia ?? 'INDIVIDUAL',
         fase: item?.fase ?? '',
         formatos: item?.formatos ?? [],
+        enlace: item?.enlace ?? '',
         titulo: item?.titulo ?? '',
         instrucciones: item?.instrucciones ?? '',
         duracion_minutos: item?.duracion_minutos ?? '',
@@ -67,6 +68,7 @@ function RecursoForm({ item, temas, onClose }) {
         if (!values.nivel) local.nivel = 'Elige el nivel.'
         if (!values.estrategia) local.estrategia = 'Elige la estrategia.'
         if (editing && !values.formatos.length) local.formatos = 'Elige al menos un formato.'
+        if (errorEnlace(values.enlace)) local.enlace = errorEnlace(values.enlace)
         if (!values.titulo.trim()) local.titulo = 'Escribe el título.'
         if (!values.instrucciones.trim()) local.instrucciones = 'Escribe las instrucciones para el estudiante.'
         const minutos = values.duracion_minutos === '' ? null : Number(values.duracion_minutos)
@@ -81,6 +83,7 @@ function RecursoForm({ item, temas, onClose }) {
             estrategia: values.estrategia,
             fase: values.fase,
             formatos: values.formatos,
+            enlace: values.enlace.trim(),
             titulo: values.titulo.trim(),
             instrucciones: values.instrucciones.trim(),
             duracion_minutos: minutos,
@@ -163,6 +166,17 @@ function RecursoForm({ item, temas, onClose }) {
                     error={errors.instrucciones}
                     maxLength={2000}
                     hint="Lo que el estudiante debe hacer en casa, explicado con claridad."
+                />
+                <Field
+                    label="Enlace del recurso (opcional)"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    value={values.enlace}
+                    onChange={set('enlace')}
+                    error={errors.enlace}
+                    maxLength={500}
+                    hint="Si la actividad usa un video, un audio o un recurso digital de internet, pega aquí su dirección (https). La familia verá un botón para abrirlo."
                 />
                 <FormatosSelector
                     value={values.formatos}
@@ -336,6 +350,7 @@ export default function Recursos() {
                                         </p>
                                         <p className="mt-1.5 line-clamp-2 text-sm text-ink-700">{r.instrucciones}</p>
                                         <FormatosChips formatos={r.formatos} className="mt-2" />
+                                        <EnlaceRecurso enlace={r.enlace} formatos={r.formatos} className="mt-2" />
                                         <p className="mt-1.5 text-xs text-ink-500">
                                             {r.duracion_minutos ? `${r.duracion_minutos} min · ` : ''}
                                             Creado por {r.creado_por_nombre ?? 'el sistema'}

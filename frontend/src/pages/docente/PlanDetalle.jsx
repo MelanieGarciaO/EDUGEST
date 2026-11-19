@@ -6,7 +6,7 @@ import { ArrowLeft, Ban, CheckCircle2, Pencil, Plus, RotateCcw, Send, Sparkles, 
 import { api, fetchAll, parseApiError } from '../../api/client'
 import { PlanHeader, PlanTemas } from '../../components/PlanView'
 import { Alert, Button, ConfirmDialog, Field, Modal, PageHeader, SelectField, Spinner, TextAreaField } from '../../components/ui'
-import { DUA_POR_FASE, ESTRATEGIAS, FASES_ERCA, NIVEL_LABEL, PRINCIPIOS_DUA } from '../../lib/format'
+import { DUA_POR_FASE, errorEnlace, ESTRATEGIAS, FASES_ERCA, NIVEL_LABEL, PRINCIPIOS_DUA } from '../../lib/format'
 import { usePlan } from '../../lib/queries'
 import { FormatosSelector } from '../../components/FormatosRecurso'
 
@@ -61,7 +61,7 @@ function ObjetivoModal({ tema, planId, onClose }) {
 /** Edita una actividad existente (actividad) o agrega una propia (tema). */
 function ActividadModal({ actividad, tema, planId, onClose }) {
     const abierto = !!(actividad || tema)
-    const inicial = () => ({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION', formatos: actividad?.formatos ?? [] })
+    const inicial = () => ({ titulo: actividad?.titulo ?? '', instrucciones: actividad?.instrucciones ?? '', duracion: actividad?.duracion_minutos ? String(actividad.duracion_minutos) : '', estrategia: actividad?.estrategia ?? '', fase: actividad?.fase || 'APLICACION', formatos: actividad?.formatos ?? [], enlace: actividad?.enlace ?? '' })
     const [f, setF] = useState(inicial)
     // Al abrir con otra actividad o tema se recarga el formulario (sin efecto).
     const [previo, setPrevio] = useState({ actividad, tema })
@@ -70,7 +70,7 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
         if (abierto) setF(inicial())
     }
     const guardar = useAccion(planId, async () => {
-        const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia, fase: f.fase, formatos: f.formatos }
+        const body = { titulo: f.titulo.trim(), instrucciones: f.instrucciones.trim(), duracion_minutos: f.duracion ? Number(f.duracion) : null, estrategia: f.estrategia, fase: f.fase, formatos: f.formatos, enlace: f.enlace.trim() }
         return actividad
             ? (await api.patch(`/reinforcement/actividades/${actividad.id}/`, body)).data
             : (await api.post(`/reinforcement/temas-plan/${tema.id}/actividades/`, body)).data
@@ -89,7 +89,7 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
             footer={
                 <>
                     <Button variant="secondary" onClick={onClose} disabled={guardar.isPending}>Cancelar</Button>
-                    <Button loading={guardar.isPending} disabled={!f.titulo.trim() || !f.instrucciones.trim() || (actividad && !f.formatos.length)} onClick={() => guardar.mutate(undefined, { onSuccess: onClose })}>
+                    <Button loading={guardar.isPending} disabled={!f.titulo.trim() || !f.instrucciones.trim() || (actividad && !f.formatos.length) || !!errorEnlace(f.enlace)} onClick={() => guardar.mutate(undefined, { onSuccess: onClose })}>
                         {actividad ? 'Guardar cambios' : 'Agregar actividad'}
                     </Button>
                 </>
@@ -113,6 +113,16 @@ function ActividadModal({ actividad, tema, planId, onClose }) {
                     </SelectField>
                     <Field label="Duración (min)" type="number" min="1" max="240" value={f.duracion} onChange={set('duracion')} error={err?.fields.duracion_minutos} hint="Opcional." />
                 </div>
+                <Field
+                    label="Enlace del video, audio o recurso digital (opcional)"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://…"
+                    maxLength={500}
+                    value={f.enlace}
+                    onChange={set('enlace')}
+                    error={err?.fields.enlace || errorEnlace(f.enlace)}
+                />
                 <FormatosSelector
                     value={f.formatos}
                     onChange={(formatos) => setF((x) => ({ ...x, formatos }))}

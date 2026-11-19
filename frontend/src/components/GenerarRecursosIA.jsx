@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, FileText, Lightbulb, Paperclip, RotateCcw, Sparkles, X } from 'lucide-react'
 
 import { api, parseApiError } from '../api/client'
-import { ESTRATEGIAS, FASES_ERCA, NIVELES, temaLabel } from '../lib/format'
+import { errorEnlace, ESTRATEGIAS, FASES_ERCA, NIVELES, temaLabel } from '../lib/format'
 import { Alert, Button, Chip, Field, Modal, SelectField, TextAreaField } from './ui'
 import { FormatosSelector } from './FormatosRecurso'
 
@@ -126,6 +126,17 @@ function Propuesta({ p, onChange }) {
                     <Field label="Duración (min)" type="number" min="1" max="240" value={p.duracion_minutos} onChange={set('duracion_minutos')} error={p.errores?.duracion_minutos} />
                 </div>
                 <TextAreaField label="Instrucciones" rows={6} value={p.instrucciones} onChange={set('instrucciones')} maxLength={2000} error={p.errores?.instrucciones} />
+                <Field
+                    label="Enlace del video, audio o recurso digital (opcional)"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://…"
+                    maxLength={500}
+                    value={p.enlace ?? ''}
+                    onChange={set('enlace')}
+                    error={p.errores?.enlace || errorEnlace(p.enlace)}
+                    hint="La IA no propone enlaces: agrégalo tú si la actividad usa un video o audio de internet."
+                />
                 <FormatosSelector
                     value={p.formatos ?? []}
                     onChange={(formatos) => onChange({ ...p, formatos })}
@@ -210,6 +221,7 @@ export default function GenerarRecursosIA({ temas, config, onClose }) {
                     estrategia: p.estrategia,
                     fase: p.fase ?? '',
                     formatos: p.formatos ?? [],
+                    enlace: (p.enlace ?? '').trim(),
                     titulo: p.titulo.trim(),
                     instrucciones: p.instrucciones.trim(),
                     duracion_minutos: p.duracion_minutos === '' ? null : Number(p.duracion_minutos),
