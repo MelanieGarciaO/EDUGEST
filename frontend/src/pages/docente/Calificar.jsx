@@ -11,6 +11,7 @@ import { formatNota, nivelNota } from '../../lib/format'
 import { useActividad, useNotasActividad, useParalelos, useTemasActivos } from '../../lib/queries'
 import { AdjuntosActividad, EntregaEstudiante } from '../../components/ArchivosActividad'
 import { useEntregasPorEstudiante } from '../../lib/archivos'
+import DescripcionActividad from '../../components/DescripcionActividad'
 
 /** Convierte «8,5» o «8.5» en un número válido entre 0 y 10; null si está vacío y NaN si no sirve. */
 /** Borde del campo de nota según el semáforo LOEI. */
@@ -215,7 +216,7 @@ export default function Calificar() {
             />
 
             <div className="mb-5 max-w-3xl rounded-xl bg-white px-4 py-3">
-                <p className="whitespace-pre-line text-ink-700">{a.descripcion}</p>
+                <DescripcionActividad texto={a.descripcion} className="text-ink-700" />
                 <AdjuntosActividad actividad={a} />
             </div>
 

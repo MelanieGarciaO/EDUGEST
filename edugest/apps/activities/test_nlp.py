@@ -236,3 +236,26 @@ class TemaYBordesTests(MotorBase):
         pipeline = nlp.obtener_nlp()
         if pipeline is not None:
             self.assertEqual(nlp.extraer("Tarea", TODAS, HOY, nlp=pipeline)["motor"], "spacy")
+
+
+class EstructuraDescripcionTests(MotorBase):
+    """La descripción conserva los saltos de línea del docente (títulos, partes, listas)."""
+
+    def test_conserva_lineas_y_quita_fecha(self):
+        r = self.extraer(
+            "Hoja de fracciones de Matemáticas para el próximo lunes\n"
+            "Objetivo: reconocer fracciones equivalentes.\n\n\n"
+            "Parte 1.   Completa\n"
+            "a) 1/2 = ___/4\n"
+            "b) 2/3 = 4/___"
+        )
+        self.assertEqual(r["fecha_entrega"], "2026-10-05")
+        self.assertEqual(
+            r["descripcion"],
+            "Hoja de fracciones\nObjetivo: reconocer fracciones equivalentes.\n\n"
+            "Parte 1. Completa\na) 1/2 = ___/4\nb) 2/3 = 4/___",
+        )
+
+    def test_texto_en_una_linea_no_cambia(self):
+        r = self.extraer("Para el próximo lunes realizar las páginas 20 y 21 de Matemáticas.")
+        self.assertNotIn("\n", r["descripcion"])

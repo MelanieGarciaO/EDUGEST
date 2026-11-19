@@ -7,6 +7,7 @@ import { MaterialesChips } from './Materiales'
 import { NivelChip } from './Semaforo'
 import { Chip } from './ui'
 import { cx } from '../lib/cx'
+import DescripcionActividad from './DescripcionActividad'
 
 /**
  * Tarjeta de una actividad. `children` recibe las acciones (editar, cancelar…).
@@ -64,7 +65,7 @@ export default function ActividadCard({ actividad: a, showDocente = false, adjun
                 </div>
             </div>
 
-            <p className="mt-3 whitespace-pre-line text-ink-900">{a.descripcion}</p>
+            <DescripcionActividad texto={a.descripcion} className="mt-3 text-ink-900" />
 
             {a.materiales?.length > 0 && (
                 <div className="mt-3">

@@ -129,9 +129,15 @@ def _sin_spans(texto, spans, desde=0, hasta=None):
 _RE_PREP_FINAL = re.compile(r"(?:\s+(?:de|del|en|para|y|e|el|la|con|a))+$", re.IGNORECASE)
 
 
+def _compactar(texto):
+    """Une espacios repetidos pero conserva los saltos de línea (máx. una línea en blanco)."""
+    lineas = [" ".join(linea.split()) for linea in texto.splitlines()]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lineas)).strip()
+
+
 def _limpiar(texto):
-    t = " ".join(texto.split())
-    t = re.sub(r"\s+([,;.:])", r"\1", t)
+    t = _compactar(texto)
+    t = re.sub(r"[ \t]+([,;.:])", r"\1", t)
     t = re.sub(r"^[\s,;.:]+", "", t)
     t = re.sub(r"^(?:y|e)\s+", "", t, flags=re.IGNORECASE)
     t = re.sub(r"[\s,;:.]+$", "", t)
@@ -626,7 +632,9 @@ def extraer(texto, asignaturas, hoy, nlp=None, temas=None):
     - nlp: pipeline de spaCy (opcional; sin él se usa solo reglas).
     - temas: catálogo del grado como lista de (id, nombre, asignatura_id) (opcional).
     """
-    texto = " ".join(texto.split())
+    # Se conservan los saltos de línea para que la descripción mantenga su estructura
+    # (títulos, partes, listas numeradas). \s de las expresiones también los reconoce.
+    texto = _compactar(texto)
     advertencias = []
 
     fecha, conf_fecha, spans_fecha, adv = _buscar_fecha(texto, hoy)
