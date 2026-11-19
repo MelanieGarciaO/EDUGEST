@@ -283,8 +283,8 @@ class DuaPorFaseTests(RefuerzoBase):
         TemaPlan.objects.update(**{c: "" for c in self.CAMPOS})
         TemaPlan.objects.filter(pk=tema["id"]).update(dua_implicacion="Escrito por el docente.", dua_origen="DOCENTE")
 
-        estado = MigrationLoader(connection).project_state(("reinforcement", "0009_dua_por_fase_erca"))
-        migracion = importlib.import_module("apps.reinforcement.migrations.0009_dua_por_fase_erca")
+        estado = MigrationLoader(connection).project_state(("reinforcement", "0010_prellenar_dua_por_fase"))
+        migracion = importlib.import_module("apps.reinforcement.migrations.0010_prellenar_dua_por_fase")
         migracion.prellenar(estado.apps, None)
 
         tp = TemaPlan.objects.get(pk=tema["id"])
