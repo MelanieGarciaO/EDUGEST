@@ -110,6 +110,15 @@ class Actividad(models.Model):
             "estudiantes en el tema calificado."
         ),
     )
+    # Solo para evaluaciones de refuerzo: los estudiantes a los que va dirigida (los que
+    # completaron su plan al 100 % y esperaban evaluación cuando se publicó). El resto del
+    # paralelo no la ve, no la entrega y no se le califica.
+    destinatarios = models.ManyToManyField(
+        "academic.Estudiante",
+        blank=True,
+        related_name="evaluaciones_refuerzo",
+        verbose_name="dirigida a",
+    )
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.PUBLICADA, db_index=True
     )
@@ -136,6 +145,18 @@ class Actividad(models.Model):
 
     def __str__(self):
         return f"{self.asignacion.asignatura} - {self.fecha_entrega}"
+
+    def estudiantes_dirigidos(self):
+        """
+        Estudiantes activos a los que va la actividad: todo el paralelo, o solo los
+        destinatarios si es una evaluación de refuerzo.
+        """
+        from apps.academic.models import Estudiante
+
+        qs = Estudiante.objects.filter(paralelo_id=self.asignacion.paralelo_id, is_active=True)
+        if self.es_evaluacion_refuerzo:
+            qs = qs.filter(pk__in=self.destinatarios.values("pk"))
+        return qs
 
     @property
     def tiene_hora(self):

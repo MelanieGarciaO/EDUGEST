@@ -11,7 +11,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.academic import selectors as academic_selectors
-from apps.academic.models import Estudiante
 from apps.academic.views import filter_by_id
 from apps.activities import selectors as activities_selectors
 from apps.security.permissions import IsDocente, IsDocenteOrAdministrador, IsPasswordUpToDate
@@ -53,9 +52,8 @@ class ActividadCalificacionesView(APIView):
     def get(self, request, actividad_id):
         actividad = self._actividad(request, actividad_id)
         paralelo = actividad.asignacion.paralelo
-        estudiantes = Estudiante.objects.filter(paralelo=paralelo, is_active=True).order_by(
-            "last_name", "first_name"
-        )
+        # En una evaluación de refuerzo, solo los estudiantes que completaron su plan.
+        estudiantes = actividad.estudiantes_dirigidos().order_by("last_name", "first_name")
         notas = {
             c.estudiante_id: c
             for c in Calificacion.objects.filter(actividad=actividad).select_related("tema")
@@ -90,6 +88,7 @@ class ActividadCalificacionesView(APIView):
                     "asignatura_nombre": actividad.asignacion.asignatura.nombre,
                     "paralelo_nombre": paralelo.nombre_completo,
                     "vigencia": actividad.vigencia(timezone.localdate()),
+                    "es_evaluacion_refuerzo": actividad.es_evaluacion_refuerzo,
                 },
                 "resumen": {
                     "estudiantes": len(filas),
@@ -149,9 +148,7 @@ class _ActividadDocenteMixin:
             ),
             pk=actividad_id,
         )
-        estudiantes = Estudiante.objects.filter(
-            paralelo=actividad.asignacion.paralelo, is_active=True
-        ).order_by("last_name", "first_name")
+        estudiantes = actividad.estudiantes_dirigidos().order_by("last_name", "first_name")
         return actividad, estudiantes
 
 

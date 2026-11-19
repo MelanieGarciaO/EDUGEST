@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -46,6 +46,8 @@ class ActividadViewSet(viewsets.ModelViewSet):
         POST   extraer-texto/  -> lee un PDF o imagen (multipart «archivo») y devuelve su
                                   texto para revisarlo antes de previsualizar
         POST   previsualizar/  -> procesa la indicación con PLN y devuelve una propuesta
+        GET    evaluacion-destinatarios/?paralelo=&asignatura=
+                               -> a quién iría una evaluación de refuerzo (plan completado)
         POST   /               -> publica la actividad (tras revisar la propuesta)
         PATCH  /{id}/          -> edita descripción, fecha, materiales o tema
         POST   /{id}/cancelar/ -> cancela la actividad
@@ -93,7 +95,11 @@ class ActividadViewSet(viewsets.ModelViewSet):
         estudiante = _id_param(params, "estudiante")
         if estudiante is not None:
             if academic_selectors.puede_ver_estudiante(user, estudiante):
-                qs = qs.filter(asignacion__paralelo__estudiantes__id=estudiante).distinct()
+                # Las evaluaciones de refuerzo solo cuentan para sus destinatarios.
+                qs = qs.filter(
+                    Q(es_evaluacion_refuerzo=False) | Q(destinatarios__id=estudiante),
+                    asignacion__paralelo__estudiantes__id=estudiante,
+                ).distinct()
             else:
                 qs = qs.none()
 
@@ -128,6 +134,26 @@ class ActividadViewSet(viewsets.ModelViewSet):
         if estudiante is not None:
             notas = notas.filter(estudiante_id=estudiante)
         return Prefetch("calificaciones", queryset=notas, to_attr="notas_representante")
+
+    # --- Evaluación de refuerzo: a quién iría -----------------------------------
+    @action(detail=False, methods=["get"], url_path="evaluacion-destinatarios")
+    def evaluacion_destinatarios(self, request):
+        """
+        ?paralelo=&asignatura= -> estudiantes que recibirían una evaluación de refuerzo:
+        los que tienen un plan de la asignatura completado al 100 % y pendiente de evaluación.
+        """
+        from apps.reinforcement.selectors import estudiantes_para_evaluacion
+
+        paralelo = _id_param(request.query_params, "paralelo")
+        asignatura = _id_param(request.query_params, "asignatura")
+        if paralelo is None or asignatura is None:
+            raise ValidationError({"detail": "Indica el paralelo y la asignatura."})
+        if not AsignacionDocente.objects.filter(
+            docente=request.user, paralelo_id=paralelo, asignatura_id=asignatura, is_active=True
+        ).exists():
+            raise ValidationError({"asignatura": "No impartes esa asignatura en este paralelo."})
+        estudiantes = estudiantes_para_evaluacion(paralelo, asignatura)
+        return Response({"estudiantes": [{"id": e.id, "nombre": e.full_name} for e in estudiantes]})
 
     # --- Vista previa con PLN -------------------------------------------------
     @action(detail=False, methods=["post"], url_path="previsualizar")

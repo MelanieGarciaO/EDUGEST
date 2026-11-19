@@ -17,7 +17,6 @@ from collections import defaultdict
 from django.db import transaction
 from django.dispatch import receiver
 
-from apps.academic.models import Estudiante
 from apps.activities.models import Actividad
 from apps.activities.signals import actividad_cancelada, actividad_modificada, actividad_publicada
 from apps.grades import scale
@@ -75,11 +74,12 @@ def _resumen(texto, maximo=160):
 
 
 def _estudiantes_por_representante(actividad):
-    """{representante: [estudiantes]} de los estudiantes activos del paralelo."""
+    """
+    {representante: [estudiantes]} de los estudiantes a los que va la actividad: todo el
+    paralelo o, en una evaluación de refuerzo, solo los que completaron su plan.
+    """
     grupos = defaultdict(list)
-    for e in Estudiante.objects.filter(
-        paralelo_id=actividad.asignacion.paralelo_id, is_active=True
-    ).select_related("representante"):
+    for e in actividad.estudiantes_dirigidos().select_related("representante"):
         grupos[e.representante].append(e)
     return grupos
 
