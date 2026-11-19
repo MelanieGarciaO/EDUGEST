@@ -12,6 +12,7 @@ Si nadie los indica (recursos antiguos, semillas), se deducen del título y las 
 
 import re
 import unicodedata
+from urllib.parse import urlsplit
 
 from django.db import models
 
@@ -30,7 +31,7 @@ MAX_FORMATOS = 4
 
 # Palabras que delatan cada formato (sin tildes, en minúsculas).
 _PISTAS = {
-    FormatoRecurso.VIDEO: r"\bvideos?\b|\bvideotutorial|\bclip\b|\byoutube\b",
+    FormatoRecurso.VIDEO: r"\bvideos?\b|\bvideotutorial|\bclip\b|\byoutube\b|\byoutu\.be\b|\bvimeo\b",
     FormatoRecurso.AUDIO: r"\baudios?\b|\bescuch\w*|\bcancion\w*|\bpodcast\b|\bgraba\w*|\bvoz alta\b|\bdictado\b",
     FormatoRecurso.JUEGO: r"\bjueg\w*|\bjuga\w*|\bbingo\b|\bloteria\b|\bdomino\b|\bmemoria\b|\bdados?\b|\bcartas?\b|\bnaipes?\b|\brompecabezas\b|\badivinanza\w*|\bcompetencia\b|\bconcurso\b",
     FormatoRecurso.MANIPULATIVO: (
@@ -82,3 +83,32 @@ def completar_existentes(Recurso, Actividad):
         for obj in modelo.objects.filter(formatos=[]).only("id", "titulo", "instrucciones", "formatos"):
             obj.formatos = inferir(obj.titulo, obj.instrucciones)
             obj.save(update_fields=["formatos"])
+
+
+# ---------------------------------------------------------------------------
+# Enlace del recurso (video, audio o recurso digital que está en internet)
+# ---------------------------------------------------------------------------
+MAX_ENLACE = 500
+
+
+def validar_enlace(valor):
+    """
+    Devuelve el enlace limpio o lanza ValueError con el motivo. Solo https, sin usuario ni
+    contraseña en la URL y sin direcciones locales: se abre en el navegador de la familia.
+    """
+    enlace = (valor or "").strip()
+    if not enlace:
+        return ""
+    if len(enlace) > MAX_ENLACE:
+        raise ValueError(f"El enlace es muy largo (máximo {MAX_ENLACE} caracteres).")
+    if re.search(r"\s", enlace):
+        raise ValueError("El enlace no puede tener espacios.")
+    partes = urlsplit(enlace)
+    if partes.scheme.lower() != "https":
+        raise ValueError("Usa un enlace seguro que empiece con https://")
+    host = (partes.hostname or "").lower()
+    if not host or "." not in host or partes.username or partes.password:
+        raise ValueError("El enlace no es válido.")
+    if host in {"localhost"} or host.endswith(".local") or re.fullmatch(r"[\d.]+|\[?[0-9a-f:]+\]?", host):
+        raise ValueError("Usa la dirección pública del recurso (no una dirección IP ni local).")
+    return enlace

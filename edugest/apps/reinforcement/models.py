@@ -59,6 +59,8 @@ class RecursoRefuerzo(models.Model):
     # Cómo se presenta (DUA · representación): texto, imágenes, audio, video, material, juego...
     # Lista de valores de formatos.FormatoRecurso. Si queda vacía se deduce del texto al guardar.
     formatos = models.JSONField("formatos", default=list, blank=True)
+    # Opcional: dónde está el video, audio o recurso digital (https). Se abre en otra pestaña.
+    enlace = models.URLField("enlace del recurso", max_length=500, blank=True)
     titulo = models.CharField("título", max_length=200)
     instrucciones = models.TextField("instrucciones")
     duracion_minutos = models.PositiveSmallIntegerField(
@@ -93,7 +95,7 @@ class RecursoRefuerzo(models.Model):
         if not self.formatos:
             from .formatos import inferir
 
-            self.formatos = inferir(self.titulo, self.instrucciones)
+            self.formatos = inferir(self.titulo, self.instrucciones, self.enlace)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -261,6 +263,7 @@ class ActividadRefuerzo(models.Model):
     estrategia = models.CharField(max_length=15, choices=EstrategiaRefuerzo.choices, blank=True)
     fase = models.CharField("fase ERCA", max_length=20, choices=FaseErca.choices, blank=True)
     formatos = models.JSONField("formatos", default=list, blank=True)  # copiados del recurso
+    enlace = models.URLField("enlace del recurso", max_length=500, blank=True)  # copiado del recurso
     orden = models.PositiveSmallIntegerField(default=0)
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True
@@ -282,7 +285,7 @@ class ActividadRefuerzo(models.Model):
         if not self.formatos:
             from .formatos import inferir
 
-            self.formatos = inferir(self.titulo, self.instrucciones)
+            self.formatos = inferir(self.titulo, self.instrucciones, self.enlace)
         super().save(*args, **kwargs)
 
     def __str__(self):

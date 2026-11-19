@@ -134,3 +134,49 @@ class IAFormatosTests(RefuerzoBase):
         self.assertEqual(res.status_code, 200, res.data)
         self.assertEqual([p["formatos"] for p in res.data["propuestas"]], [["VISUAL", "MANIPULATIVO"], ["MANIPULATIVO"]])
         self.assertIn("formatos", ia.esquema(None)["properties"]["recursos"]["items"]["required"])
+
+
+class EnlaceRecursoTests(RefuerzoBase):
+    """Enlace opcional al video, audio o recurso digital del recurso."""
+
+    def crear(self, **extra):
+        self.auth(self.doc1)
+        datos = {"tema": self.fracciones.id, "nivel": "BASICO", "titulo": "Video de fracciones",
+                 "instrucciones": "Mira el video y dibuja dos ejemplos.", **extra}
+        return self.client.post(reverse("recurso-list"), datos, format="json")
+
+    def test_validar_enlace(self):
+        self.assertEqual(formatos.validar_enlace("  https://www.youtube.com/watch?v=abc  "), "https://www.youtube.com/watch?v=abc")
+        self.assertEqual(formatos.validar_enlace(""), "")
+        for malo in ("http://sitio.com/video", "javascript:alert(1)", "https://localhost/v", "https://192.168.1.5/v",
+                     "https://usuario:clave@sitio.com", "https://sitio .com", "ftp://sitio.com", "https://sinpunto"):
+            with self.assertRaises(ValueError, msg=malo):
+                formatos.validar_enlace(malo)
+
+    def test_crear_con_enlace_y_formato_deducido(self):
+        res = self.crear(enlace="https://youtu.be/abc123", instrucciones="Observa con atención y responde.")
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(res.data["enlace"], "https://youtu.be/abc123")
+        self.assertIn("VIDEO", res.data["formatos"])  # deducido del enlace
+
+    def test_enlace_invalido(self):
+        res = self.crear(enlace="http://sitio.com/video")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("https://", str(res.data["enlace"]))
+
+    def test_se_copia_al_plan_y_se_edita(self):
+        RecursoRefuerzo.objects.filter(pk__in=[self.b1.pk]).update(enlace="https://www.youtube.com/watch?v=xyz")
+        tema = self.plan_con({self.fracciones: 6})["temas"][0]
+        actividad = next(a for a in tema["actividades"] if a["recurso"] == self.b1.id)
+        self.assertEqual(actividad["enlace"], "https://www.youtube.com/watch?v=xyz")
+        self.auth(self.doc1)
+        url = reverse("actividad-refuerzo-detail", args=[actividad["id"]])
+        self.assertEqual(self.client.patch(url, {"enlace": "https://vimeo.com/1"}, format="json").data["enlace"], "https://vimeo.com/1")
+        self.assertEqual(self.client.patch(url, {"enlace": ""}, format="json").data["enlace"], "")
+        self.assertEqual(self.client.patch(url, {"enlace": "http://x.com"}, format="json").status_code, 400)
+        # Actividad propia con enlace.
+        res = self.client.post(reverse("tema-plan-agregar-actividad", args=[tema["id"]]), {
+            "titulo": "Canción de fracciones", "instrucciones": "Escucha la canción y repite.",
+            "enlace": "https://audio.ejemplo.com/cancion.mp3",
+        }, format="json")
+        self.assertEqual((res.status_code, res.data["enlace"]), (201, "https://audio.ejemplo.com/cancion.mp3"))

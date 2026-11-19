@@ -174,6 +174,7 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
                     nivel=recurso.nivel,
                     estrategia=recurso.estrategia,
                     formatos=list(recurso.formatos),
+                    enlace=recurso.enlace,
                     fase=fase,
                     orden=posicion,
                 )
@@ -245,7 +246,7 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
 @transaction.atomic
 def agregar_actividad(
     tema_plan, *, recurso=None, titulo=None, instrucciones=None, duracion_minutos=None, estrategia="", fase="",
-    formatos=None,
+    formatos=None, enlace="",
 ):
     plan = tema_plan.plan
     verificar_editable(plan)
@@ -277,6 +278,7 @@ def agregar_actividad(
             nivel=recurso.nivel,
             estrategia=recurso.estrategia,
             formatos=list(recurso.formatos),
+            enlace=recurso.enlace,
             fase=fase or recurso.fase or erca.fase_por_nivel(recurso.nivel),
             orden=siguiente,
         )
@@ -289,6 +291,7 @@ def agregar_actividad(
         duracion_minutos=duracion_minutos,
         estrategia=estrategia or "",
         formatos=formatos or [],  # vacío: se deduce del texto al guardar
+        enlace=enlace or "",
         fase=fase or FaseErca.APLICACION,
         orden=siguiente,
     )

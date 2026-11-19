@@ -36,6 +36,20 @@ def campo_formatos():
     )
 
 
+def campo_enlace():
+    """Enlace opcional al video, audio o recurso digital (solo https)."""
+    return serializers.CharField(required=False, allow_blank=True, max_length=600, trim_whitespace=True)
+
+
+def _validar_enlace(value):
+    from .formatos import validar_enlace
+
+    try:
+        return validar_enlace(value)
+    except ValueError as exc:
+        raise serializers.ValidationError(str(exc)) from None
+
+
 def _limpiar_formatos(value):
     from .formatos import limpiar
 
@@ -72,6 +86,7 @@ class ActividadRefuerzoSerializer(serializers.ModelSerializer):
             "nivel",
             "estrategia",
             "formatos",
+            "enlace",
             "fase",
             "orden",
             "estado",
@@ -333,9 +348,13 @@ class AgregarActividadSerializer(serializers.Serializer):
     )
     fase = serializers.ChoiceField(choices=FaseErca.choices, required=False, allow_blank=True)
     formatos = campo_formatos()  # vacío: se deduce del texto
+    enlace = campo_enlace()
 
     def validate_formatos(self, value):
         return _limpiar_formatos(value)
+
+    def validate_enlace(self, value):
+        return _validar_enlace(value)
 
     def validate(self, attrs):
         if "recurso" not in attrs:
@@ -359,10 +378,14 @@ class ActividadRefuerzoEditarSerializer(serializers.ModelSerializer):
 
     fase = serializers.ChoiceField(choices=FaseErca.choices, required=False)
     formatos = campo_formatos()
+    enlace = campo_enlace()
 
     class Meta:
         model = ActividadRefuerzo
-        fields = ("titulo", "instrucciones", "duracion_minutos", "estrategia", "fase", "formatos")
+        fields = ("titulo", "instrucciones", "duracion_minutos", "estrategia", "fase", "formatos", "enlace")
+
+    def validate_enlace(self, value):
+        return _validar_enlace(value)
 
     def validate_formatos(self, value):
         if not value:
@@ -394,6 +417,7 @@ class RecursoSerializer(serializers.ModelSerializer):
     )
     instrucciones = serializers.CharField(max_length=2000)
     formatos = campo_formatos()
+    enlace = campo_enlace()
 
     class Meta:
         model = RecursoRefuerzo
@@ -409,6 +433,7 @@ class RecursoSerializer(serializers.ModelSerializer):
             "estrategia",
             "fase",
             "formatos",
+            "enlace",
             "titulo",
             "instrucciones",
             "duracion_minutos",
@@ -426,6 +451,9 @@ class RecursoSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("El título no puede estar vacío.")
         return value
+
+    def validate_enlace(self, value):
+        return _validar_enlace(value)
 
     def validate_formatos(self, value):
         # Al crear puede ir vacío (se deduce del texto); al editar debe quedar al menos uno.
