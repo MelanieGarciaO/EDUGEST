@@ -204,6 +204,11 @@ class TemaPlan(models.Model):
     dua_implicacion = models.TextField("DUA: implicación (motivación)", blank=True)
     dua_representacion = models.TextField("DUA: representación (cómo se presenta)", blank=True)
     dua_accion_expresion = models.TextField("DUA: acción y expresión (cómo lo demuestra)", blank=True)
+    # Un apoyo DUA dentro de cada fase del ciclo ERCA (el DUA da flexibilidad en cada momento).
+    dua_experiencia = models.TextField("DUA en la fase de Experiencia", blank=True)
+    dua_reflexion = models.TextField("DUA en la fase de Reflexión", blank=True)
+    dua_conceptualizacion = models.TextField("DUA en la fase de Conceptualización", blank=True)
+    dua_aplicacion = models.TextField("DUA en la fase de Aplicación", blank=True)
     dua_origen = models.CharField(max_length=10, choices=OrigenDua.choices, default=OrigenDua.REGLAS)
 
     class Meta:

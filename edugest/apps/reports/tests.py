@@ -123,7 +123,8 @@ class ContenidoTests(ReportesBase):
         dua = hojas["Apoyos DUA por tema"][6]
         self.assertEqual(dua[2], "Fracciones")
         self.assertIn("material concreto", dua[4])
-        self.assertEqual(dua[6], "Reglas del sistema")
+        self.assertIn("situación real de casa", dua[6])  # DUA en la fase de Experiencia
+        self.assertEqual(dua[10], "Reglas del sistema")
 
     def test_avance_del_representante(self):
         texto = self.texto_pdf(self.bajar("avance", self.rep1, estudiante=self.est1.id))

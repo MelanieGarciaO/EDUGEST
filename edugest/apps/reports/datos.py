@@ -230,7 +230,8 @@ def planes(user, f):
     apoyos = Seccion(
         "Apoyos DUA por tema",
         [("Estudiante", 2.2), ("Asignatura", 1.6), ("Tema", 2), ("Implicación", 3.2),
-         ("Representación", 3.2), ("Acción y expresión", 3.2), ("Origen", 1.3)],
+         ("Representación", 3.2), ("Acción y expresión", 3.2), ("E · Experiencia", 3),
+         ("R · Reflexión", 3), ("C · Conceptualización", 3), ("A · Aplicación", 3), ("Origen", 1.3)],
     )
     temas = Seccion(
         "Resultado por tema",
@@ -253,7 +254,8 @@ def planes(user, f):
             ])
             apoyos.filas.append([
                 p.estudiante.full_name, p.asignatura.nombre, str(t.tema), t.dua_implicacion,
-                t.dua_representacion, t.dua_accion_expresion, t.get_dua_origen_display(),
+                t.dua_representacion, t.dua_accion_expresion, t.dua_experiencia, t.dua_reflexion,
+                t.dua_conceptualizacion, t.dua_aplicacion, t.get_dua_origen_display(),
             ])
     return [_limitar(general), _limitar(temas), _limitar(apoyos)]
 

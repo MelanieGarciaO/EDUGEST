@@ -179,10 +179,12 @@ def generar_plan(docente, estudiante, asignatura, temas_manuales=None):
 
     def apoyos_dua(tema, nivel, reincidente=False, motivo=""):
         d = dua.sugerir(asignatura.nombre, tema.nombre, nivel, reincidente, motivo)
+        por_fase = dua.sugerir_fases(asignatura.nombre, tema.nombre, nivel, reincidente, motivo)
         return {
             "dua_implicacion": d["implicacion"],
             "dua_representacion": d["representacion"],
             "dua_accion_expresion": d["accion_expresion"],
+            **{f"dua_{fase}": por_fase[fase] for fase in dua.FASES},
         }
 
     orden = 0
