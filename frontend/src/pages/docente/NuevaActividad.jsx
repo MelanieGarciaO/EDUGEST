@@ -7,9 +7,10 @@ import { api, parseApiError } from '../../api/client'
 import { MaterialesInput } from '../../components/Materiales'
 import { Alert, Button, Card, CheckboxField, Field, PageHeader, SelectField, TextAreaField } from '../../components/ui'
 import { hoyISO } from '../../lib/dates'
-import { useAsignaciones } from '../../lib/queries'
+import { useAsignaciones, useDestinatariosEvaluacion } from '../../lib/queries'
 import { ModalidadEntrega, SelectorPdf } from '../../components/ArchivosActividad'
 import LeerDesdeArchivo from '../../components/LeerDesdeArchivo'
+import DestinatariosEvaluacion from '../../components/DestinatariosEvaluacion'
 
 const MIN = 3
 const MAX = 2000
@@ -103,6 +104,12 @@ export default function NuevaActividad() {
     })
 
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+    // Evaluación de refuerzo: a quién iría (solo estudiantes con su plan completado).
+    const destinatarios = useDestinatariosEvaluacion(
+        prev?.paralelo,
+        form?.asignatura ? Number(form.asignatura) : null,
+        Boolean(prev && form?.es_evaluacion_refuerzo),
+    )
     const len = texto.trim().length
     const canPreview = !!paraleloId && len >= MIN && len <= MAX
     const previewError = preview.isError ? parseApiError(preview.error) : null
@@ -237,10 +244,11 @@ export default function NuevaActividad() {
                 <SelectorPdf archivos={pdfs} onChange={setPdfs} />
                 <CheckboxField
                     label="Es una evaluación de refuerzo"
-                    hint="Su nota cerrará los planes de refuerzo completados de los estudiantes en el tema que califiques."
+                    hint="Solo para los estudiantes que completaron su plan de refuerzo al 100 %. Su nota evalúa el plan y cuenta en el promedio como recuperación."
                     checked={form.es_evaluacion_refuerzo}
                     onChange={(e) => setForm((x) => ({ ...x, es_evaluacion_refuerzo: e.target.checked }))}
                 />
+                {form.es_evaluacion_refuerzo && <DestinatariosEvaluacion consulta={destinatarios} error={f.es_evaluacion_refuerzo} />}
 
                 <div className="flex flex-wrap justify-between gap-3 border-t border-line pt-4">
                     <Button variant="secondary" onClick={() => setPrev(null)} disabled={publish.isPending}>
@@ -250,7 +258,12 @@ export default function NuevaActividad() {
                         variant="ok"
                         onClick={() => publish.mutate()}
                         loading={publish.isPending}
-                        disabled={!form.asignatura || !form.descripcion.trim() || !form.fecha_entrega}
+                        disabled={
+                            !form.asignatura ||
+                            !form.descripcion.trim() ||
+                            !form.fecha_entrega ||
+                            (form.es_evaluacion_refuerzo && !destinatarios.data?.length)
+                        }
                     >
                         <Send className="size-4" aria-hidden="true" />
                         Publicar actividad

@@ -65,6 +65,13 @@ export default function ActividadCard({ actividad: a, showDocente = false, adjun
                 </div>
             </div>
 
+            {a.es_evaluacion_refuerzo && a.destinatarios?.length > 0 && (
+                <p className="mt-2 text-sm text-ink-700">
+                    <span className="font-bold text-ok-600">Solo para quienes completaron su plan de refuerzo: </span>
+                    {a.destinatarios.map((e) => e.nombre).join(', ')}
+                </p>
+            )}
+
             <DescripcionActividad texto={a.descripcion} className="mt-3 text-ink-900" />
 
             {a.materiales?.length > 0 && (

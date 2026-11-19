@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, parseApiError } from '../api/client'
 import { horaCorta, hoyISO } from '../lib/dates'
 import { ModalidadEntrega } from './ArchivosActividad'
+import DestinatariosEvaluacion from './DestinatariosEvaluacion'
+import { useDestinatariosEvaluacion } from '../lib/queries'
 import { MaterialesInput } from './Materiales'
 import { Alert, Button, CheckboxField, Field, Modal, TextAreaField } from './ui'
 
@@ -50,6 +52,9 @@ export default function ActividadEditModal({ actividad, onClose }) {
 
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
     const f = err.fields
+    // Al marcarla como evaluación se muestra a quién irá (solo quienes completaron su plan).
+    const nuevaEvaluacion = Boolean(form?.es_evaluacion_refuerzo && !actividad?.es_evaluacion_refuerzo)
+    const destinatarios = useDestinatariosEvaluacion(actividad?.paralelo, actividad?.asignatura, nuevaEvaluacion)
 
     return (
         <Modal
@@ -81,10 +86,18 @@ export default function ActividadEditModal({ actividad, onClose }) {
                     {f.modalidad_entrega ? <p className="text-sm font-medium text-danger-600">{f.modalidad_entrega}</p> : null}
                     <CheckboxField
                         label="Es una evaluación de refuerzo"
-                        hint="Su nota cerrará los planes de refuerzo completados de los estudiantes en el tema que califiques."
+                        hint="Solo para los estudiantes que completaron su plan de refuerzo al 100 %. Su nota evalúa el plan y cuenta en el promedio como recuperación."
                         checked={form.es_evaluacion_refuerzo}
                         onChange={(e) => setForm((x) => ({ ...x, es_evaluacion_refuerzo: e.target.checked }))}
                     />
+                    {nuevaEvaluacion && <DestinatariosEvaluacion consulta={destinatarios} />}
+                    {!nuevaEvaluacion && form.es_evaluacion_refuerzo && actividad.destinatarios?.length > 0 && (
+                        <p className="text-sm text-ink-700">
+                            <span className="font-bold">Dirigida a: </span>
+                            {actividad.destinatarios.map((e) => e.nombre).join(', ')}
+                        </p>
+                    )}
+                    {f.es_evaluacion_refuerzo && <p className="text-sm font-medium text-danger-600">{f.es_evaluacion_refuerzo}</p>}
                 </div>
             )}
         </Modal>
