@@ -155,7 +155,11 @@ class Actividad(models.Model):
 
         qs = Estudiante.objects.filter(paralelo_id=self.asignacion.paralelo_id, is_active=True)
         if self.es_evaluacion_refuerzo:
-            qs = qs.filter(pk__in=self.destinatarios.values("pk"))
+            # Destinatarios y, por si acaso, quien ya tenga nota: nunca se esconde una nota registrada.
+            qs = qs.filter(
+                models.Q(pk__in=self.destinatarios.values("pk"))
+                | models.Q(pk__in=self.calificaciones.values("estudiante_id"))
+            )
         return qs
 
     @property

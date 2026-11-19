@@ -358,3 +358,14 @@ class EvaluacionSoloPlanCompletadoTests(RefuerzoBase):
         )
         # Marta ya tenía nota (se conserva) y Luis tiene su plan completado pendiente.
         self.assertEqual(set(vieja.destinatarios.values_list("id", flat=True)), {self.est1.id, self.est3.id})
+
+    def test_calificado_sin_ser_destinatario_sigue_visible(self):
+        """Una nota ya registrada en la evaluación nunca se esconde, aunque no sea destinatario."""
+        self.completar()
+        actividad = Actividad.objects.get(pk=self.publicar().data["id"])
+        actividad.fecha_entrega = timezone.localdate()
+        actividad.save(update_fields=["fecha_entrega"])
+        grades_services.guardar_calificaciones(actividad, self.fracciones, [(self.est3.id, Decimal("9"))], self.doc1)
+        self.auth(self.doc1)
+        filas = self.client.get(reverse("actividad-calificaciones", args=[actividad.id])).data["calificaciones"]
+        self.assertEqual({f["estudiante"] for f in filas}, {self.est1.id, self.est3.id})

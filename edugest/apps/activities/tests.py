@@ -497,3 +497,43 @@ class SelectoresTests(ActivitiesBase):
         resultado = selectors.actividades_para_recordatorio(HOY)
         self.assertEqual([a.pk for a in resultado], [manana.pk])
     
+
+
+class AdminAccionesTests(ActivitiesBase):
+    """Acciones del admin de Django para cambiar el estado de varias actividades."""
+
+    def setUp(self):
+        super().setUp()
+        from django.contrib.admin.sites import site
+        from django.test import RequestFactory
+
+        self.modelo_admin = site._registry[Actividad]
+        self.request = RequestFactory().post("/admin/")
+        self.mensajes = []
+        self.modelo_admin.message_user = lambda request, texto, *a, **kw: self.mensajes.append(texto)
+        self.addCleanup(delattr, self.modelo_admin, "message_user")  # restaura el método de la clase
+
+    def accion(self, nombre, *actividades):
+        self.mensajes.clear()
+        qs = Actividad.objects.filter(pk__in=[a.pk for a in actividades])
+        getattr(self.modelo_admin, nombre)(self.request, qs)
+        return " ".join(self.mensajes)
+
+    def test_cancelar_y_volver_a_publicar(self):
+        a, b = self.crear_actividad(), self.crear_actividad()
+        avisos = []
+        actividad_cancelada.connect(lambda **kw: avisos.append(kw["actividad"].pk), weak=False, dispatch_uid="t-admin")
+        try:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertIn("canceladas: 2", self.accion("cancelar_actividades", a, b))
+        finally:
+            actividad_cancelada.disconnect(dispatch_uid="t-admin")
+        a.refresh_from_db()
+        self.assertEqual(a.estado, Actividad.Estado.CANCELADA)
+        self.assertIsNotNone(a.cancelada_en)
+        self.assertEqual(sorted(avisos), sorted([a.pk, b.pk]))  # se avisa como desde la app
+
+        self.assertIn("ya estaba cancelada", self.accion("cancelar_actividades", a))
+        self.assertIn("publicadas de nuevo: 1", self.accion("publicar_actividades", a))
+        a.refresh_from_db()
+        self.assertEqual((a.estado, a.cancelada_en), (Actividad.Estado.PUBLICADA, None))

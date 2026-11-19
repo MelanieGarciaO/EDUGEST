@@ -1,10 +1,14 @@
 from django.contrib import admin
+from rest_framework.exceptions import ValidationError
 
+from apps.admin_acciones import AccionesActivoMixin, informar, primer_error
+
+from . import services
 from .models import ActividadRefuerzo, PlanRefuerzo, RecursoRefuerzo, TemaPlan
 
 
 @admin.register(RecursoRefuerzo)
-class RecursoRefuerzoAdmin(admin.ModelAdmin):
+class RecursoRefuerzoAdmin(AccionesActivoMixin, admin.ModelAdmin):
     list_display = ("titulo", "tema", "nivel", "estrategia", "is_active", "creado_por")
     list_filter = ("nivel", "estrategia", "is_active", "tema__asignatura", "tema__grado")
     search_fields = ("titulo", "instrucciones")
@@ -33,7 +37,13 @@ class TemaPlanInline(admin.TabularInline):
 
 @admin.register(PlanRefuerzo)
 class PlanRefuerzoAdmin(admin.ModelAdmin):
-    """Solo lectura: los planes se gestionan por la API, con sus reglas y eventos."""
+    """
+    Solo lectura: los planes se gestionan por la API, con sus reglas y eventos. La única
+    acción es «Cancelar», con la misma lógica de la app (avisa a la familia). Aprobar es
+    decisión del docente; «Completado» y la evaluación los marca el sistema.
+    """
+
+    actions = ("cancelar_planes",)
 
     list_display = ("id", "estudiante", "asignatura", "nivel", "estado", "docente", "created_at")
     list_filter = ("estado", "nivel", "asignatura")
@@ -48,3 +58,14 @@ class PlanRefuerzoAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @admin.action(description="Cancelar planes seleccionados (en propuesta o aprobados)")
+    def cancelar_planes(self, request, queryset):
+        hechos, omitidos = 0, []
+        for plan in queryset:
+            try:
+                services.cancelar_plan(plan, request.user)
+                hechos += 1
+            except ValidationError as exc:
+                omitidos.append(f"{plan}: {primer_error(exc)}")
+        informar(self, request, hechos, omitidos, "cancelados")
