@@ -525,7 +525,7 @@ class AdminAccionesTests(ActivitiesBase):
         actividad_cancelada.connect(lambda **kw: avisos.append(kw["actividad"].pk), weak=False, dispatch_uid="t-admin")
         try:
             with self.captureOnCommitCallbacks(execute=True):
-                self.assertIn("2 actividades canceladas", self.accion("cancelar_actividades", a, b))
+                self.assertIn("canceladas: 2", self.accion("cancelar_actividades", a, b))
         finally:
             actividad_cancelada.disconnect(dispatch_uid="t-admin")
         a.refresh_from_db()
@@ -533,7 +533,7 @@ class AdminAccionesTests(ActivitiesBase):
         self.assertIsNotNone(a.cancelada_en)
         self.assertEqual(sorted(avisos), sorted([a.pk, b.pk]))  # se avisa como desde la app
 
-        self.assertIn("ya estaban canceladas", self.accion("cancelar_actividades", a))
-        self.assertIn("1 actividad publicada", self.accion("publicar_actividades", a))
+        self.assertIn("ya estaba cancelada", self.accion("cancelar_actividades", a))
+        self.assertIn("publicadas de nuevo: 1", self.accion("publicar_actividades", a))
         a.refresh_from_db()
         self.assertEqual((a.estado, a.cancelada_en), (Actividad.Estado.PUBLICADA, None))

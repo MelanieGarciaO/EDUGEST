@@ -1,6 +1,8 @@
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.db import transaction
 from django.utils import timezone
+
+from apps.admin_acciones import informar
 
 from .models import Actividad, Extraccion
 from .signals import actividad_cancelada
@@ -30,24 +32,17 @@ class ActividadAdmin(admin.ModelAdmin):
             transaction.on_commit(
                 lambda a=actividad: actividad_cancelada.send(sender=Actividad, actividad=a)
             )
-        self._informar(request, len(pendientes), queryset.count(), "cancelada", "canceladas", "ya estaban canceladas")
+        omitidas = [f"{a}: ya estaba cancelada." for a in queryset.filter(estado=Actividad.Estado.CANCELADA)]
+        informar(self, request, len(pendientes), omitidas, "canceladas")
 
     @admin.action(description="Volver a publicar actividades seleccionadas")
     def publicar_actividades(self, request, queryset):
         """Revierte una cancelación hecha por error (no envía avisos)."""
-        n = queryset.exclude(estado=Actividad.Estado.PUBLICADA).update(
+        omitidas = [f"{a}: ya estaba publicada." for a in queryset.filter(estado=Actividad.Estado.PUBLICADA)]
+        hechas = queryset.exclude(estado=Actividad.Estado.PUBLICADA).update(
             estado=Actividad.Estado.PUBLICADA, cancelada_en=None, updated_at=timezone.now()
         )
-        self._informar(request, n, queryset.count(), "publicada", "publicadas", "ya estaban publicadas")
-
-    def _informar(self, request, cambiadas, total, singular, plural, sin_cambio):
-        if cambiadas:
-            self.message_user(
-                request, f"{cambiadas} actividad{'es' if cambiadas != 1 else ''} {plural if cambiadas != 1 else singular}.",
-                messages.SUCCESS,
-            )
-        if total - cambiadas:
-            self.message_user(request, f"{total - cambiadas} {sin_cambio}: no se modificaron.", messages.INFO)
+        informar(self, request, hechas, omitidas, "publicadas de nuevo")
 
 
 @admin.register(Extraccion)

@@ -26,10 +26,8 @@ def primer_error(exc):
 
 def informar(modelo_admin, request, hechos, omitidos, accion):
     """Mensajes de resultado: cuántos cambiaron y por qué se omitió cada uno."""
-    nombre = modelo_admin.model._meta
     if hechos:
-        etiqueta = nombre.verbose_name if hechos == 1 else nombre.verbose_name_plural
-        modelo_admin.message_user(request, f"{hechos} {etiqueta}: {accion}.", messages.SUCCESS)
+        modelo_admin.message_user(request, f"Listo — {accion}: {hechos}.", messages.SUCCESS)
     for texto in omitidos[:10]:
         modelo_admin.message_user(request, f"Sin cambios — {texto}", messages.WARNING)
     if len(omitidos) > 10:
