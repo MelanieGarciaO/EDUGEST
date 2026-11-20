@@ -309,6 +309,20 @@ def aprobar_plan(plan, usuario):
         raise ValidationError(
             {"detail": "El plan no tiene actividades. Agrega al menos una antes de aprobarlo."}
         )
+    # RF08-CA05: ningún tema puede quedar con un apoyo DUA vacío (generales ni por fase ERCA).
+    campos_dua = {
+        "dua_implicacion": "implicación", "dua_representacion": "representación",
+        "dua_accion_expresion": "acción y expresión", "dua_experiencia": "fase de experiencia",
+        "dua_reflexion": "fase de reflexión", "dua_conceptualizacion": "fase de conceptualización",
+        "dua_aplicacion": "fase de aplicación",
+    }
+    for tema_plan in plan.temas.select_related("tema"):
+        vacios = [nombre for campo, nombre in campos_dua.items() if not (getattr(tema_plan, campo) or "").strip()]
+        if vacios:
+            raise ValidationError({
+                "detail": f"Completa los apoyos DUA de «{tema_plan.tema.nombre}» antes de aprobar: "
+                f"{', '.join(vacios)}."
+            })
     plan.estado = Estado.APROBADA
     plan.aprobado_por = usuario
     plan.aprobado_en = timezone.now()

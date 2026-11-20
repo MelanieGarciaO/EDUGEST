@@ -292,3 +292,20 @@ class DuaPorFaseTests(RefuerzoBase):
         self.assertTrue(all(getattr(tp, c) for c in self.CAMPOS))
         # No toca los principios generales ni el origen.
         self.assertEqual((tp.dua_implicacion, tp.dua_origen), ("Escrito por el docente.", "DOCENTE"))
+
+
+class AprobarConDuaVacioTests(RefuerzoBase):
+    """RF08-CA05 (CP13): no se aprueba un plan con algún apoyo DUA vacío."""
+
+    def test_rechaza_y_luego_aprueba(self):
+        plan = self.plan_con({self.fracciones: "5"})
+        TemaPlan.objects.filter(plan_id=plan["id"]).update(dua_representacion="")
+        self.auth(self.doc1)
+        res = self.post(reverse("plan-aprobar", args=[plan["id"]]))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("representación", str(res.data))
+        TemaPlan.objects.filter(plan_id=plan["id"]).update(dua_representacion="Con tiras de papel y dibujos.", dua_aplicacion=" ")
+        res = self.post(reverse("plan-aprobar", args=[plan["id"]]))
+        self.assertIn("fase de aplicación", str(res.data))
+        TemaPlan.objects.filter(plan_id=plan["id"]).update(dua_aplicacion="Practicar con repartos nuevos.")
+        self.assertEqual(self.post(reverse("plan-aprobar", args=[plan["id"]])).status_code, 200)
