@@ -33,5 +33,7 @@ USER edugest
 
 EXPOSE 10000
 
-# Render define PORT. --timeout 180: la IA puede tardar hasta 150 s (IA_TIMEOUT_SEGUNDOS).
-CMD gunicorn edugest.wsgi:application --bind 0.0.0.0:${PORT} --workers 2 --timeout 180 --access-logfile -
+# Al arrancar: aplica las migraciones pendientes y levanta Gunicorn.
+# Render define PORT y WEB_CONCURRENCY (1 en el plan gratis: 512 MB no alcanzan para dos copias de spaCy).
+# --timeout 180: la IA puede tardar hasta 150 s (IA_TIMEOUT_SEGUNDOS).
+CMD python manage.py migrate --noinput && gunicorn edugest.wsgi:application --bind 0.0.0.0:${PORT} --workers ${WEB_CONCURRENCY:-1} --threads 4 --timeout 180 --access-logfile -
