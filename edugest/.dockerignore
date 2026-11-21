@@ -1,0 +1,25 @@
+# Nunca dentro de la imagen: secretos y archivos locales.
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+staticfiles/
+media/
+*.log
+*.sqlite3
+
+.git
+.gitignore
+.vscode/
+.idea/
+Dockerfile
+.dockerignore
