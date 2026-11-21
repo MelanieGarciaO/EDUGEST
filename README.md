@@ -1,10 +1,13 @@
 # EduGest
 
 [![CI](https://github.com/MelanieGarciaO/EDUGEST/actions/workflows/ci.yml/badge.svg)](https://github.com/MelanieGarciaO/EDUGEST/actions/workflows/ci.yml)
+[![Tareas programadas](https://github.com/MelanieGarciaO/EDUGEST/actions/workflows/tareas-programadas.yml/badge.svg)](https://github.com/MelanieGarciaO/EDUGEST/actions/workflows/tareas-programadas.yml)
 ![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
 ![React](https://img.shields.io/badge/React-Vite-61DAFB?logo=react&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Backend-Docker%20%2B%20Render-2496ED?logo=docker&logoColor=white)
+![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)
 
 Aplicativo web para la **gestión de actividades académicas y planes de refuerzo** entre docentes y
 representantes de estudiantes de **Educación General Básica Media (5.º a 7.º grado)**.
@@ -17,6 +20,9 @@ representante lo acompaña desde casa y una evaluación de refuerzo cierra el ci
 > Proyecto de titulación — Ingeniería de Software, Universidad Estatal de Milagro (UNEMI).
 > Modalidad: Estudio de Caso Práctico. Los datos del sistema son simulados.
 
+**Aplicación desplegada:** [edugest-kappa.vercel.app](https://edugest-kappa.vercel.app) ·
+API: [edugest-api-444v.onrender.com/api/health/](https://edugest-api-444v.onrender.com/api/health/)
+
 ---
 
 ## Contenido
@@ -28,6 +34,7 @@ representante lo acompaña desde casa y una evaluación de refuerzo cierra el ci
 - [Instalación local](#instalación-local)
 - [Datos de ejemplo](#datos-de-ejemplo)
 - [Pruebas e integración continua](#pruebas-e-integración-continua)
+- [Despliegue](#despliegue)
 - [Tareas programadas](#tareas-programadas)
 - [Autores](#autores)
 
@@ -71,14 +78,16 @@ representante lo acompaña desde casa y una evaluación de refuerzo cierra el ci
 
 ```mermaid
 flowchart LR
-    U[Docente / Representante / Administrador] --> F[Frontend<br/>React + Vite]
-    F -- "API REST + JWT" --> B[Backend<br/>Django + DRF]
+    U[Docente / Representante / Administrador] --> F[Frontend<br/>React + Vite<br/>Vercel]
+    F -- "API REST + JWT (HTTPS)" --> B[Backend<br/>Django + DRF + Gunicorn<br/>Docker en Render]
     B --> DB[(PostgreSQL<br/>Supabase)]
     B --> S3[(Archivos<br/>Supabase Storage)]
     B --> PLN[PLN<br/>spaCy + reglas]
     B --> OCR[OCR<br/>Tesseract]
     B --> IA[IA generativa<br/>Google Gemini]
     B --> M[Correo<br/>Resend]
+    GH[GitHub Actions] -. "CI: pruebas, lint y build" .-> B
+    GH -. "Tareas programadas" .-> DB
 ```
 
 El backend está organizado en aplicaciones de Django:
@@ -106,6 +115,7 @@ El backend está organizado en aplicaciones de Django:
 | IA | Google Gemini (Google AI Studio) |
 | Correo | Resend |
 | Calidad | Pruebas de Django, ESLint, GitHub Actions |
+| Despliegue | Docker y Gunicorn en Render (backend), Vercel (frontend), GitHub Actions (tareas programadas) |
 
 ---
 
@@ -113,11 +123,15 @@ El backend está organizado en aplicaciones de Django:
 
 ```
 EDUGEST/
-├── .github/workflows/ci.yml   # Integración continua
+├── .github/workflows/
+│   ├── ci.yml                 # Integración continua (pruebas, lint y build)
+│   └── tareas-programadas.yml # Recordatorios y cola de contraseñas (cron)
 ├── edugest/                   # Backend (Django)
 │   ├── apps/                  # Aplicaciones del dominio (ver tabla de arquitectura)
 │   ├── edugest/               # settings.py, test_settings.py, urls.py
 │   ├── seed_data/             # JSON con datos de ejemplo
+│   ├── Dockerfile             # Imagen de producción (Render), con Tesseract
+│   ├── .dockerignore
 │   ├── requirements.txt
 │   ├── .env.example
 │   └── manage.py
@@ -128,6 +142,7 @@ EDUGEST/
     │   ├── layout/            # Estructura general de la app
     │   ├── lib/               # Consultas a la API (TanStack Query) y utilidades
     │   └── pages/             # Pantallas por rol (admin, docente, representante)
+    ├── vercel.json            # Rutas de la SPA en Vercel
     └── package.json
 ```
 
@@ -234,14 +249,115 @@ pull request:
 | Backend | PostgreSQL 16, Python 3.10, Tesseract, dependencias con el modelo de spaCy, `manage.py check`, verificación de migraciones y pruebas |
 | Frontend | Node 22, ESLint y build de producción |
 
+**Docker (opcional, para probar la imagen de producción en local):**
+
+```bash
+cd edugest
+docker build -t edugest-api .
+docker run --rm -p 8000:8000 -e PORT=8000 --env-file .env edugest-api
+```
+
+---
+
+## Despliegue
+
+| Parte | Plataforma | URL |
+|---|---|---|
+| Frontend | Vercel | https://edugest-kappa.vercel.app |
+| Backend (API) | Render · Web Service con Docker (plan gratuito) | https://edugest-api-444v.onrender.com |
+| Base de datos y archivos | Supabase (PostgreSQL por *session pooler* y Storage S3) | — |
+| Correo | Resend | — |
+| Tareas programadas | GitHub Actions | — |
+
+Render y Vercel están conectados al repositorio y publican automáticamente cada cambio en `main`;
+Render espera a que el CI termine en verde (*Auto-Deploy: After CI Checks Pass*).
+
+### Backend en Render
+
+El servicio se construye con [`edugest/Dockerfile`](edugest/Dockerfile):
+
+- Parte de `python:3.10-slim` e instala **Tesseract con el idioma español** (OCR de fotos y PDF
+  escaneados).
+- Instala `requirements.txt` (incluido el modelo de spaCy) y ejecuta `collectstatic` (WhiteNoise sirve
+  los estilos del panel de administración).
+- Corre con un usuario sin privilegios.
+- Al arrancar aplica las migraciones pendientes y levanta Gunicorn con 1 worker y 4 hilos
+  (`WEB_CONCURRENCY`), por la memoria del plan gratuito.
+
+| Campo en Render | Valor |
+|---|---|
+| Language | Docker |
+| Branch | `main` |
+| Root Directory | `edugest` |
+| Dockerfile Path | `edugest/Dockerfile` |
+| Docker Command | *(vacío: usa el `CMD` del Dockerfile)* |
+| Health Check Path | *(vacío)* |
+| Auto-Deploy | After CI Checks Pass |
+
+Variables de entorno: las mismas de [`edugest/.env.example`](edugest/.env.example), con estos valores
+de producción (sin las `TEST_DB_*`):
+
+| Variable | Valor en producción |
+|---|---|
+| `DEBUG` | `False` |
+| `SECRET_KEY` | Una clave nueva, distinta de la de desarrollo |
+| `ALLOWED_HOSTS` | `edugest-api-444v.onrender.com` |
+| `ADMIN_URL` | Una ruta propia, distinta de `admin/` |
+| `DB_*` | Datos del *session pooler* de Supabase (`DB_PORT=5432`, `DB_SSLMODE=require`; Render no tiene IPv6) |
+| `DB_CONN_MAX_AGE` | `60` |
+| `CORS_ALLOWED_ORIGINS` | `https://edugest-kappa.vercel.app` |
+| `CSRF_TRUSTED_ORIGINS` | `https://edugest-api-444v.onrender.com,https://edugest-kappa.vercel.app` |
+| `FRONTEND_URL` | `https://edugest-kappa.vercel.app` |
+| `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `BEHIND_PROXY` | `True` |
+| `SECURE_HSTS_SECONDS` | `3600` (o más, cuando todo esté estable) |
+
+> En el plan gratuito el servicio se duerme tras 15 minutos sin uso; la primera petición siguiente
+> tarda alrededor de un minuto en responder.
+
+### Frontend en Vercel
+
+| Campo en Vercel | Valor |
+|---|---|
+| Framework Preset | Vite |
+| Root Directory | `frontend` |
+| Build Command / Output | `npm run build` / `dist` |
+| Variable de entorno | `VITE_API_URL=https://edugest-api-444v.onrender.com/api` |
+
+[`frontend/vercel.json`](frontend/vercel.json) redirige todas las rutas a `index.html` para que React
+Router funcione al recargar una página interna. `VITE_API_URL` queda incluida en el build: si cambia,
+hay que volver a desplegar (*Redeploy*). Vercel advierte que las variables `VITE_` son públicas; es
+correcto para esta URL, pero **nunca** debe ponerse una clave con ese prefijo.
+
+### Correo con dominio propio
+
+Con el remitente de prueba `onboarding@resend.dev`, Resend solo entrega correos al dueño de la cuenta.
+Para que lleguen a todos los representantes hay que verificar un dominio propio en Resend (registros
+DNS SPF y DKIM) y cambiar `DEFAULT_FROM_EMAIL` (por ejemplo, `EduGest <no-responder@dominio>`).
+
 ---
 
 ## Tareas programadas
 
-| Comando | Qué hace | Frecuencia sugerida |
+Se ejecutan con GitHub Actions ([`.github/workflows/tareas-programadas.yml`](.github/workflows/tareas-programadas.yml)),
+porque los *cron jobs* de Render no están en el plan gratuito. El workflow se conecta a la base de
+Supabase con los secretos del repositorio y envía los correos por Resend.
+
+| Comando | Qué hace | Frecuencia |
 |---|---|---|
-| `python manage.py enviar_recordatorios` | Recuerda por correo las actividades que se entregan mañana | Una vez al día |
-| `python manage.py procesar_envios_acceso` | Envía los correos de acceso pendientes de las importaciones de usuarios | Cada pocos minutos |
+| `python manage.py enviar_recordatorios` | Recuerda por correo las actividades que se entregan mañana | Todos los días a las 17:00 (Ecuador) |
+| `python manage.py procesar_envios_acceso` | Envía los correos de acceso pendientes de las importaciones de usuarios (respaldo de la cola) | Cada hora |
+
+También se pueden ejecutar a mano desde **Actions → Tareas programadas → Run workflow**. GitHub puede
+retrasar unos minutos las ejecuciones programadas.
+
+Secretos del repositorio (**Settings → Secrets and variables → Actions**):
+
+| Secreto | Valor |
+|---|---|
+| `SECRET_KEY` | La misma de Render |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | Datos del *session pooler* de Supabase |
+| `RESEND_API_KEY`, `DEFAULT_FROM_EMAIL` | Los mismos de Render |
+| `FRONTEND_URL` | `https://edugest-kappa.vercel.app` |
 
 ---
 
