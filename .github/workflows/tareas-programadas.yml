@@ -1,0 +1,69 @@
+# Tareas programadas de EduGest (reemplazan a los cron jobs de Render, que no son gratuitos).
+# Se conectan a la base de Supabase con los secretos del repositorio y envían los correos por Resend.
+#   - Recordatorios: todos los días a las 17:00 (Ecuador) avisa de las entregas de mañana.
+#   - Cola de accesos: cada hora envía las contraseñas pendientes de usuarios importados (respaldo).
+# GitHub puede retrasar unos minutos las ejecuciones programadas.
+name: Tareas programadas
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # 17:00 en Ecuador (UTC-5)
+    - cron: "30 * * * *" # cada hora, al minuto 30
+  workflow_dispatch: # para ejecutarlo a mano desde la pestaña Actions
+    inputs:
+      tarea:
+        description: "Tarea a ejecutar"
+        type: choice
+        options: [recordatorios, envios-acceso]
+        default: recordatorios
+
+concurrency:
+  group: tareas-${{ github.event.schedule || inputs.tarea }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tarea:
+    name: ${{ (github.event.schedule == '0 22 * * *' || inputs.tarea == 'recordatorios') && 'Recordatorios de entrega' || 'Cola de contraseñas' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: edugest
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DEBUG: "False"
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_SSLMODE: require
+      EMAIL_BACKEND: apps.notifications.backends.ResendEmailBackend
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+      # El proceso termina al acabar el comando: los correos se envían en el mismo hilo.
+      NOTIFICACIONES_ASINCRONAS: "False"
+      COLA_ACCESOS_ASINCRONA: "False"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: edugest/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Enviar recordatorios de entrega
+        if: github.event.schedule == '0 22 * * *' || inputs.tarea == 'recordatorios'
+        run: python manage.py enviar_recordatorios
+
+      - name: Procesar la cola de contraseñas
+        if: github.event.schedule == '30 * * * *' || inputs.tarea == 'envios-acceso'
+        run: python manage.py procesar_envios_acceso
