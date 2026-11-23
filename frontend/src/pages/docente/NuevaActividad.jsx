@@ -129,7 +129,7 @@ export default function NuevaActividad() {
                 <PageHeader title="Nueva actividad" subtitle="Escribe la tarea con tus palabras o léela desde un PDF o una foto. Antes de publicar podrás revisar lo que entendimos." />
                 <Card className="max-w-3xl space-y-5">
                     {previewError && <Alert>{previewError.fields.texto ?? previewError.fields.paralelo ?? previewError.message}</Alert>}
-                    <SelectField label="Paralelo" value={paraleloId} onChange={(e) => setParalelo(e.target.value)}>
+                    <SelectField label="Curso y Paralelo" value={paraleloId} onChange={(e) => setParalelo(e.target.value)}>
                         <option value="">Selecciona un paralelo</option>
                         {paralelos.map(([id, nombre]) => (
                             <option key={id} value={id}>{nombre}</option>
