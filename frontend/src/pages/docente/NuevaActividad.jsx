@@ -177,7 +177,7 @@ export default function NuevaActividad() {
             <PageHeader title="Revisa la actividad" subtitle="Corrige lo que haga falta. Nada se publica hasta que confirmes." />
             <Card className="max-w-3xl space-y-5">
                 <p className="text-sm font-semibold text-ink-500">
-                    Paralelo: <span className="text-ink-900">{paralelos.find(([id]) => id === prev.paralelo)?.[1] ?? ''}</span>
+                    Curso y Paralelo: <span className="text-ink-900">{paralelos.find(([id]) => id === prev.paralelo)?.[1] ?? ''}</span>
                 </p>
                 {p.advertencias?.length > 0 && (
                     <Alert tone="warn">
