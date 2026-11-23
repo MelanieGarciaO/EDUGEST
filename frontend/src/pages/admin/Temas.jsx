@@ -130,7 +130,12 @@ function TemaForm({ item, padre, grados, asignaturas, onClose }) {
                     value={values.nombre}
                     onChange={set('nombre')}
                     error={errors.nombre}
-                    hint={editing ? 'El grado, la asignatura y el tema padre no se pueden cambiar una vez creado.' : undefined}
+                    maxLength={150}
+                    hint={
+                        editing
+                            ? 'El grado, la asignatura y el tema padre no se pueden cambiar una vez creado.'
+                            : 'Debe contener letras (no solo números o símbolos).'
+                    }
                 />
             </form>
         </Modal>

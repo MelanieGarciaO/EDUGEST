@@ -53,8 +53,8 @@ export default function Estudiantes() {
     }
 
     const fields = [
-        { name: 'first_name', label: 'Nombres' },
-        { name: 'last_name', label: 'Apellidos' },
+        { name: 'first_name', label: 'Nombres', maxLength: 150, autoComplete: 'off', hint: 'Solo letras, sin números ni símbolos.' },
+        { name: 'last_name', label: 'Apellidos', maxLength: 150, autoComplete: 'off', hint: 'Solo letras, sin números ni símbolos.' },
         {
             name: 'paralelo',
             label: 'Paralelo',

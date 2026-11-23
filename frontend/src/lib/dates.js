@@ -11,6 +11,13 @@ export function hoyISO() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+/** Fecha límite para una entrega: un año desde hoy (lo mismo que valida el servidor). */
+export function maxEntregaISO() {
+    const d = new Date()
+    d.setDate(d.getDate() + 365)
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 /** «Viernes 17 de octubre» */
 export function formatFecha(iso) {
     const texto = new Intl.DateTimeFormat('es-EC', { weekday: 'long', day: 'numeric', month: 'long' }).format(parseFecha(iso))

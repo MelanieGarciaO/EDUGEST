@@ -53,7 +53,14 @@ function ObjetivoModal({ tema, planId, onClose }) {
             }
         >
             {err && <Alert className="mb-3">{err.fields.objetivo ?? err.message}</Alert>}
-            <TextAreaField label="Objetivo" rows={4} value={texto} onChange={(e) => setTexto(e.target.value)} />
+            <TextAreaField
+                label="Objetivo"
+                rows={4}
+                maxLength={500}
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                hint={`${texto.trim().length}/500`}
+            />
         </Modal>
     )
 }

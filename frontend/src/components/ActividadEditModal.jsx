@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { api, parseApiError } from '../api/client'
-import { horaCorta, hoyISO } from '../lib/dates'
+import { horaCorta, hoyISO, maxEntregaISO } from '../lib/dates'
 import { ModalidadEntrega } from './ArchivosActividad'
 import DestinatariosEvaluacion from './DestinatariosEvaluacion'
 import { useDestinatariosEvaluacion } from '../lib/queries'
@@ -77,7 +77,7 @@ export default function ActividadEditModal({ actividad, onClose }) {
                     {err.message && !Object.keys(f).length && <Alert>{err.message}</Alert>}
                     <TextAreaField label="Descripción" value={form.descripcion} onChange={set('descripcion')} maxLength={2000} error={f.descripcion} />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Fecha de entrega" type="date" min={hoyISO()} value={form.fecha_entrega} onChange={set('fecha_entrega')} error={f.fecha_entrega} />
+                        <Field label="Fecha de entrega" type="date" min={hoyISO()} max={maxEntregaISO()} value={form.fecha_entrega} onChange={set('fecha_entrega')} error={f.fecha_entrega} />
                         <Field label="Hora de entrega" type="time" value={form.hora_entrega} onChange={set('hora_entrega')} error={f.hora_entrega} hint="Opcional. Sin hora, la entrega vale todo el día." />
                     </div>
                     <Field label="Tema" value={form.tema} onChange={set('tema')} maxLength={150} error={f.tema} />

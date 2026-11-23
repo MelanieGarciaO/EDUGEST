@@ -100,6 +100,8 @@ export function CrudForm({ title, endpoint, entity, fields, extra, onClose, subm
                             type={f.type === 'number' ? 'number' : 'text'}
                             min={f.min}
                             max={f.max}
+                            maxLength={f.maxLength}
+                            autoComplete={f.autoComplete}
                             value={values[f.name]}
                             onChange={set(f.name)}
                             error={errors[f.name]}

@@ -112,8 +112,24 @@ function UserForm({ user, isSelf, onClose, onSaved }) {
             <form id="user-form" onSubmit={onSubmit} noValidate className="space-y-4">
                 {general && <Alert>{general}</Alert>}
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Nombres" value={form.first_name} onChange={set('first_name')} error={errors.first_name} />
-                    <Field label="Apellidos" value={form.last_name} onChange={set('last_name')} error={errors.last_name} />
+                    <Field
+                        label="Nombres"
+                        value={form.first_name}
+                        onChange={set('first_name')}
+                        error={errors.first_name}
+                        maxLength={150}
+                        autoComplete="off"
+                        hint="Solo letras, sin números ni símbolos."
+                    />
+                    <Field
+                        label="Apellidos"
+                        value={form.last_name}
+                        onChange={set('last_name')}
+                        error={errors.last_name}
+                        maxLength={150}
+                        autoComplete="off"
+                        hint="Solo letras, sin números ni símbolos."
+                    />
                 </div>
                 <Field
                     label="Correo electrónico"
@@ -121,6 +137,8 @@ function UserForm({ user, isSelf, onClose, onSaved }) {
                     value={form.email}
                     onChange={set('email')}
                     error={errors.email}
+                    maxLength={254}
+                    autoComplete="off"
                 />
                 <SelectField
                     label="Rol"

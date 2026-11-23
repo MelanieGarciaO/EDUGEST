@@ -5,7 +5,7 @@ import { FileText, Image as ImageIcon, Paperclip, Smartphone, Trash2, Upload, Us
 import { api, parseApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { abrirArchivo, useEntregas } from '../lib/archivos'
-import { Button, Chip } from './ui'
+import { Button, Chip, ConfirmDialog } from './ui'
 import { cx } from '../lib/cx'
 
 const MAX_PDF_MB = 10
@@ -118,10 +118,17 @@ export function AdjuntosActividad({ actividad, editable = false }) {
             if (ref.current) ref.current.value = ''
         },
     })
+    const [porEliminar, setPorEliminar] = useState(null) // archivo que espera confirmación
     const eliminar = useMutation({
         mutationFn: (id) => api.delete(`/activities/adjuntos/${id}/`),
-        onSuccess: refrescar,
-        onError: (e) => setError(parseApiError(e).message),
+        onSuccess: () => {
+            setPorEliminar(null)
+            refrescar()
+        },
+        onError: (e) => {
+            setPorEliminar(null)
+            setError(parseApiError(e).message)
+        },
     })
 
     if (!lista.length && !editable) return null
@@ -137,7 +144,7 @@ export function AdjuntosActividad({ actividad, editable = false }) {
                             <span className="font-normal text-ink-500">{kb(a.tamano)}</span>
                         </button>
                         {editable ? (
-                            <button type="button" className="pr-2 text-danger-600" disabled={eliminar.isPending} onClick={() => eliminar.mutate(a.id)} aria-label={`Eliminar ${a.nombre}`}>
+                            <button type="button" className="pr-2 text-danger-600" disabled={eliminar.isPending} onClick={() => setPorEliminar(a)} aria-label={`Eliminar ${a.nombre}`}>
                                 <Trash2 className="size-4" aria-hidden="true" />
                             </button>
                         ) : null}
@@ -152,7 +159,24 @@ export function AdjuntosActividad({ actividad, editable = false }) {
             </div>
             <input ref={ref} type="file" accept="application/pdf,.pdf" className="sr-only" aria-label="Agregar PDF" onChange={(e) => e.target.files?.[0] && subir.mutate(e.target.files[0])} />
             {error ? <p className="mt-1.5 text-sm font-medium text-danger-600">{error}</p> : null}
+            <ConfirmarEliminar archivo={porEliminar} cargando={eliminar.isPending} onConfirm={() => eliminar.mutate(porEliminar.id)} onClose={() => setPorEliminar(null)} />
         </div>
+    )
+}
+
+/** Pide confirmación antes de borrar un archivo ya subido (no se puede deshacer). */
+function ConfirmarEliminar({ archivo, cargando, onConfirm, onClose }) {
+    return (
+        <ConfirmDialog
+            open={!!archivo}
+            title="¿Eliminar este archivo?"
+            confirmLabel="Eliminar"
+            loading={cargando}
+            onConfirm={onConfirm}
+            onClose={onClose}
+        >
+            {archivo ? `Se eliminará «${archivo.nombre}». Esta acción no se puede deshacer.` : ''}
+        </ConfirmDialog>
     )
 }
 
@@ -216,10 +240,17 @@ export function EntregaRepresentante({ actividad }) {
             if (ref.current) ref.current.value = ''
         },
     })
+    const [porEliminar, setPorEliminar] = useState(null) // archivo que espera confirmación
     const eliminar = useMutation({
         mutationFn: (id) => api.delete(`/activities/archivos-entrega/${id}/`),
-        onSuccess: refrescar,
-        onError: (e) => setError(parseApiError(e).message),
+        onSuccess: () => {
+            setPorEliminar(null)
+            refrescar()
+        },
+        onError: (e) => {
+            setPorEliminar(null)
+            setError(parseApiError(e).message)
+        },
     })
 
     if (actividad.modalidad_entrega !== 'APP' || actividad.vigencia === 'cancelada') return null
@@ -246,7 +277,7 @@ export function EntregaRepresentante({ actividad }) {
                         {fila.archivos.length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {fila.archivos.map((a) => (
-                                    <ArchivoChip key={a.id} archivo={a} eliminando={eliminar.isPending} onEliminar={!fila.calificada && a.subido_por === user.id ? () => eliminar.mutate(a.id) : null} />
+                                    <ArchivoChip key={a.id} archivo={a} eliminando={eliminar.isPending} onEliminar={!fila.calificada && a.subido_por === user.id ? () => setPorEliminar(a) : null} />
                                 ))}
                             </div>
                         ) : null}
@@ -264,6 +295,7 @@ export function EntregaRepresentante({ actividad }) {
             })}
             <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" className="sr-only" aria-label="Archivo de la entrega" onChange={(e) => e.target.files?.[0] && destino && subir.mutate({ archivo: e.target.files[0], estudiante: destino })} />
             {error ? <p className="mt-2 text-sm font-medium text-danger-600">{error}</p> : null}
+            <ConfirmarEliminar archivo={porEliminar} cargando={eliminar.isPending} onConfirm={() => eliminar.mutate(porEliminar.id)} onClose={() => setPorEliminar(null)} />
         </div>
     )
 }

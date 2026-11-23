@@ -6,7 +6,7 @@ import { ArrowLeft, Send, Sparkles } from 'lucide-react'
 import { api, parseApiError } from '../../api/client'
 import { MaterialesInput } from '../../components/Materiales'
 import { Alert, Button, Card, CheckboxField, Field, PageHeader, SelectField, TextAreaField } from '../../components/ui'
-import { hoyISO } from '../../lib/dates'
+import { hoyISO, maxEntregaISO } from '../../lib/dates'
 import { useAsignaciones, useDestinatariosEvaluacion } from '../../lib/queries'
 import { ModalidadEntrega, SelectorPdf } from '../../components/ArchivosActividad'
 import LeerDesdeArchivo from '../../components/LeerDesdeArchivo'
@@ -14,6 +14,7 @@ import DestinatariosEvaluacion from '../../components/DestinatariosEvaluacion'
 
 const MIN = 3
 const MAX = 2000
+const MIN_DESCRIPCION = 5 // igual que el servidor
 
 /** Aviso bajo un campo según la confianza con la que se extrajo. */
 function aviso(confianza, vacio) {
@@ -217,12 +218,17 @@ export default function NuevaActividad() {
                     onChange={set('descripcion')}
                     error={f.descripcion}
                     attention={atencion.descripcion}
-                    hint={aviso(p.confianza?.descripcion, vacio('descripcion'))}
+                    hint={
+                        form.descripcion.trim().length < MIN_DESCRIPCION
+                            ? `Describe la actividad con al menos ${MIN_DESCRIPCION} caracteres.`
+                            : aviso(p.confianza?.descripcion, vacio('descripcion'))
+                    }
                 />
                 <Field
                     label="Fecha de entrega"
                     type="date"
                     min={hoyISO()}
+                    max={maxEntregaISO()}
                     value={form.fecha_entrega}
                     onChange={set('fecha_entrega')}
                     error={f.fecha_entrega}
@@ -260,7 +266,7 @@ export default function NuevaActividad() {
                         loading={publish.isPending}
                         disabled={
                             !form.asignatura ||
-                            !form.descripcion.trim() ||
+                            form.descripcion.trim().length < MIN_DESCRIPCION ||
                             !form.fecha_entrega ||
                             (form.es_evaluacion_refuerzo && !destinatarios.data?.length)
                         }

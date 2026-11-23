@@ -54,7 +54,7 @@ function GradosPanel() {
     const [form, setForm] = useState(null)
     const grados = useQuery({ queryKey: ['grados'], queryFn: () => fetchAll('/academic/grados/') })
     const fields = [
-        { name: 'nombre', label: 'Nombre', hint: 'Por ejemplo: Quinto EGB' },
+        { name: 'nombre', label: 'Nombre', maxLength: 50, hint: 'Por ejemplo: Quinto EGB' },
         { name: 'orden', label: 'Posición en EGB', type: 'number', min: 1, max: 10, hint: 'Un número del 1 al 10.' },
     ]
     return (
@@ -102,7 +102,7 @@ function ParalelosPanel() {
             type: 'select',
             options: (grados.data ?? []).map((g) => ({ value: g.id, label: g.nombre })),
         },
-        { name: 'nombre', label: 'Paralelo', hint: 'Una letra: A, B, C…' },
+        { name: 'nombre', label: 'Paralelo', maxLength: 10, hint: 'Letras o números, sin símbolos: A, B, C…' },
     ]
 
     return (
@@ -163,7 +163,7 @@ function AsignaturasPanel() {
     const [form, setForm] = useState(null)
     const [toggle, setToggle] = useState(null)
     const asignaturas = useQuery({ queryKey: ['asignaturas'], queryFn: () => fetchAll('/academic/asignaturas/') })
-    const fields = [{ name: 'nombre', label: 'Nombre', hint: 'Por ejemplo: Matemática' }]
+    const fields = [{ name: 'nombre', label: 'Nombre', maxLength: 100, hint: 'Por ejemplo: Matemática' }]
 
     return (
         <>
