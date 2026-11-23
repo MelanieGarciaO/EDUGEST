@@ -28,6 +28,7 @@
 
   --color-ok-50: #e9f7ee;
   --color-ok-600: #1f9a4d;
+  --color-ok-700: #17763b; /* texto verde sobre blanco con contraste AA */
   --color-danger-50: #fdecee;
   --color-danger-600: #d6384a;
   --color-warn-50: #fff4e0;

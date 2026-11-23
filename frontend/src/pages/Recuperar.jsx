@@ -172,6 +172,7 @@ export default function Recuperar() {
                             <CambiarClaveForm
                                 enviar={restablecer}
                                 temporalInicial={temporal}
+                                email={email.trim()}
                                 hintTemporal="Es la contraseña temporal de arriba."
                                 textoBoton="Crear mi contraseña nueva"
                                 onSuccess={applySession}

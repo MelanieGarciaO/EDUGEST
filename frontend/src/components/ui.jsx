@@ -121,10 +121,12 @@ export function Field({ label, error, hint, attention = false, className, ...inp
     )
 }
 
-export function PasswordField({ label, error, hint, className, ...input }) {
+/** `describe`: id de otro elemento que también describe el campo (p. ej. la lista de requisitos). */
+export function PasswordField({ label, error, hint, className, describe, ...input }) {
     const id = useId()
     const [visible, setVisible] = useState(false)
-    const describedBy = error ? `${id}-err` : hint ? `${id}-hint` : undefined
+    const propio = error ? `${id}-err` : hint ? `${id}-hint` : undefined
+    const describedBy = [propio, describe].filter(Boolean).join(' ') || undefined
     return (
         <div className={className}>
             <label htmlFor={id} className="mb-1.5 block text-sm font-bold text-ink-700">
