@@ -15,6 +15,8 @@ from io import BytesIO
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Protection
 from openpyxl.worksheet.datavalidation import DataValidation
+
+from apps.reports.excel_seguro import proteger_formulas
 from rest_framework.exceptions import ValidationError
 
 from . import mapeo
@@ -94,6 +96,7 @@ def generar_plantilla(actividad, estudiantes, notas):
     meta.sheet_state = "hidden"
 
     salida = BytesIO()
+    proteger_formulas(wb)  # ningún texto (p. ej. «=HYPERLINK(...)») se guarda como fórmula
     wb.save(salida)
     return salida.getvalue()
 

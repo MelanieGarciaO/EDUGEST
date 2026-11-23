@@ -24,6 +24,8 @@ from django.db import IntegrityError, connection, transaction
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
+
+from apps.reports.excel_seguro import proteger_formulas
 from rest_framework.exceptions import ValidationError
 
 from apps.academic.importaciones import (
@@ -109,6 +111,7 @@ def generar_plantilla():
     ayuda.column_dimensions["A"].width = 100
 
     salida = BytesIO()
+    proteger_formulas(wb)  # ningún texto (p. ej. «=HYPERLINK(...)») se guarda como fórmula
     wb.save(salida)
     return salida.getvalue()
 

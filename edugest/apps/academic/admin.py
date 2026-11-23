@@ -1,6 +1,8 @@
+from django import forms
 from django.contrib import admin
 
 from apps.admin_acciones import AccionesActivoMixin
+from apps.security.validadores import NombresPersonaFormMixin
 
 from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Paralelo, Tema
 from .serializers import AsignaturaSerializer, ParaleloSerializer, TemaSerializer
@@ -27,8 +29,15 @@ class AsignaturaAdmin(AccionesActivoMixin, admin.ModelAdmin):
     search_fields = ("nombre",)
 
 
+class EstudianteAdminForm(NombresPersonaFormMixin, forms.ModelForm):
+    class Meta:
+        model = Estudiante
+        fields = "__all__"
+
+
 @admin.register(Estudiante)
 class EstudianteAdmin(AccionesActivoMixin, admin.ModelAdmin):
+    form = EstudianteAdminForm
     list_display = ("full_name", "paralelo", "representante", "is_active")
     list_filter = ("paralelo__grado", "paralelo", "is_active")
     search_fields = ("first_name", "last_name")

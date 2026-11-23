@@ -9,15 +9,16 @@ from apps.admin_acciones import AccionesActivoMixin, informar
 from . import cola_accesos
 from .models import EnvioAcceso, User
 from .utils import revoke_user_tokens
+from .validadores import NombresPersonaFormMixin
 
 
-class CustomUserCreationForm(UserCreationForm):
+class CustomUserCreationForm(NombresPersonaFormMixin, UserCreationForm):
     class Meta:
         model = User
         fields = ("email", "first_name", "last_name", "role")
 
 
-class CustomUserChangeForm(UserChangeForm):
+class CustomUserChangeForm(NombresPersonaFormMixin, UserChangeForm):
     class Meta:
         model = User
         fields = "__all__"

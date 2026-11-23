@@ -16,6 +16,8 @@ from django.conf import settings
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+
+from apps.reports.excel_seguro import proteger_formulas
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -244,6 +246,7 @@ def a_xlsx(reporte):
             ws.auto_filter.ref = f"A{fila_cab}:{ultima}{fila_cab + len(seccion.filas)}"
 
     salida = BytesIO()
+    proteger_formulas(wb)  # ningún texto (p. ej. «=HYPERLINK(...)») se guarda como fórmula
     wb.save(salida)
     return salida.getvalue()
 

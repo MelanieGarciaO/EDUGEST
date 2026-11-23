@@ -109,6 +109,14 @@ class ImportarTests(Base):
         self.assertFalse(User.objects.filter(email="ana@edugest.test").exists())
         self.assertFalse(EnvioAcceso.objects.exists())
 
+    def test_nombres_con_numeros_o_simbolos(self):
+        # La importación usa el mismo serializer que el formulario: misma regla de nombres.
+        res = self.subir(xlsx(CAB, ["Ana2", "Ruiz", "ana@edugest.test", "Docente"],
+                              ["Luis", "=HYPERLINK(1)", "luis@edugest.test", "Docente"],
+                              ["José María", "Pérez-Gil", "jose@edugest.test", "Docente"]))
+        self.assertEqual([f["estado"] for f in res.data["filas"]], ["error", "error", "ok"])
+        self.assertIn("sin números ni símbolos", " ".join(res.data["filas"][0]["mensajes"]))
+
     def test_subir_el_mismo_archivo_no_duplica(self):
         archivo = (CAB, ["Ana", "Ruiz", "ana@edugest.test", "Docente"])
         self.subir(xlsx(*archivo), confirmar=True)
@@ -164,7 +172,7 @@ class ColaTests(Base):
     """El intermediario: ritmo, reintentos, límite del servicio y estado visible para el admin."""
 
     def importar(self, n=3):
-        filas = [CAB] + [[f"U{i}", "Prueba", f"u{i}@edugest.test", "Docente"] for i in range(n)]
+        filas = [CAB] + [[f"Usuario {chr(65 + i % 26)}{chr(65 + i // 26)}", "Prueba", f"u{i}@edugest.test", "Docente"] for i in range(n)]
         with mock.patch("apps.notifications.backends.requests.post") as post:
             post.return_value.status_code = 429
             post.return_value.json.return_value = {"message": "Too many requests"}

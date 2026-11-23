@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
@@ -12,6 +14,9 @@ from .signals import actividad_modificada, actividad_publicada
 
 MAX_MATERIALES = 20
 MAX_TEXTO = 2000
+MIN_DESCRIPCION = 5
+# Una fecha más lejana casi siempre es un error de tipeo (2062 en vez de 2026).
+MAX_DIAS_ENTREGA = 365
 
 
 # ---------------------------------------------------------------------------
@@ -66,9 +71,24 @@ def limpiar_materiales(valores):
 
 
 def validar_fecha_futura(valor):
-    if valor < timezone.localdate():
+    hoy = timezone.localdate()
+    if valor < hoy:
         raise serializers.ValidationError("La fecha de entrega no puede ser anterior a hoy.")
+    limite = hoy + timedelta(days=MAX_DIAS_ENTREGA)
+    if valor > limite:
+        raise serializers.ValidationError(
+            f"La fecha de entrega no puede ser posterior al {limite:%d/%m/%Y} (un año desde hoy). Revisa el año."
+        )
     return valor
+
+
+def descripcion_field(**kwargs):
+    return serializers.CharField(
+        min_length=MIN_DESCRIPCION,
+        max_length=MAX_TEXTO,
+        error_messages={"min_length": f"Describe la actividad con al menos {MIN_DESCRIPCION} caracteres."},
+        **kwargs,
+    )
 
 
 def validar_hora_no_pasada(fecha, hora):
@@ -221,7 +241,7 @@ class ActividadCrearSerializer(serializers.Serializer):
         queryset=Asignatura.objects.filter(is_active=True),
         error_messages={"does_not_exist": "La asignatura no existe o está inactiva."},
     )
-    descripcion = serializers.CharField(max_length=MAX_TEXTO)
+    descripcion = descripcion_field()
     fecha_entrega = serializers.DateField(validators=[validar_fecha_futura])
     hora_entrega = hora_field()
     materiales = materiales_field()
@@ -305,7 +325,7 @@ class ActividadCrearSerializer(serializers.Serializer):
 class ActividadEditarSerializer(serializers.ModelSerializer):
     """Solo se pueden editar estos campos; el paralelo y la asignatura no cambian."""
 
-    descripcion = serializers.CharField(max_length=MAX_TEXTO, required=False)
+    descripcion = descripcion_field(required=False)
     fecha_entrega = serializers.DateField(required=False, validators=[validar_fecha_futura])
     hora_entrega = hora_field()
     materiales = materiales_field()

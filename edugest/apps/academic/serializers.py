@@ -1,6 +1,9 @@
+import re
+
 from rest_framework import serializers
 
 from apps.security.models import Role, User
+from apps.security.validadores import con_letras, nombre_persona
 
 from .grados import grado_habilitado, mensaje_grado_no_habilitado
 from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Paralelo, Tema
@@ -37,7 +40,11 @@ class ParaleloSerializer(serializers.ModelSerializer):
         return obj.estudiantes.filter(is_active=True).count()
 
     def validate_nombre(self, value):
-        return value.strip().upper()
+        # «A», «B», «A1» o «MATUTINO»: letras, números y espacios (sin símbolos).
+        value = " ".join(value.split()).upper()
+        if not re.fullmatch(r"[^\W_]+(?: [^\W_]+)*", value):
+            raise serializers.ValidationError("El paralelo solo puede tener letras y números, por ejemplo «A» o «B».")
+        return value
 
     def validate_grado(self, value):
         cambia = self.instance is None or value.pk != self.instance.grado_id
@@ -64,7 +71,7 @@ class AsignaturaSerializer(serializers.ModelSerializer):
         fields = ("id", "nombre", "is_active")
 
     def validate_nombre(self, value):
-        value = value.strip()
+        value = con_letras(value, "El nombre de la asignatura debe contener letras.")
         qs = Asignatura.objects.filter(nombre__iexact=value)
         if self.instance is not None:
             qs = qs.exclude(pk=self.instance.pk)
@@ -114,6 +121,12 @@ class EstudianteSerializer(serializers.ModelSerializer):
             "representante_nombre",
             "is_active",
         )
+
+    def validate_first_name(self, value):
+        return nombre_persona(value, "nombres")
+
+    def validate_last_name(self, value):
+        return nombre_persona(value, "apellidos")
 
     def validate_paralelo(self, value):
         cambia = self.instance is None or value.pk != self.instance.paralelo_id
@@ -205,7 +218,7 @@ class TemaSerializer(serializers.ModelSerializer):
         validators = []
 
     def validate_nombre(self, value):
-        return " ".join(value.split())
+        return con_letras(value, "El nombre del tema debe contener letras, no solo números o símbolos.")
 
     def validate_grado(self, value):
         # Solo se controla al crear: el grado de un tema existente no se puede cambiar.

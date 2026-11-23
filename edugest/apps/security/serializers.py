@@ -5,6 +5,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Role, User
+from .validadores import nombre_persona
 
 
 TIPOS_CORREO_ACCESO = ("cuenta_creada", "acceso_reenviado", "acceso_renovado")  # = avisos.TIPOS_ACCESO
@@ -126,6 +127,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = ("email", "first_name", "last_name", "role")
 
+    def validate_first_name(self, value):
+        return nombre_persona(value, "nombres")
+
+    def validate_last_name(self, value):
+        return nombre_persona(value, "apellidos")
+
     def validate_email(self, value):
         value = value.lower()
         if User.objects.filter(email__iexact=value).exists():
@@ -147,6 +154,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("email", "first_name", "last_name", "role")
+
+    def validate_first_name(self, value):
+        return nombre_persona(value, "nombres")
+
+    def validate_last_name(self, value):
+        return nombre_persona(value, "apellidos")
 
     def validate_email(self, value):
         value = value.lower()
