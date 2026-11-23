@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { api, onSessionExpired, refreshAccess, tokenStore } from '../api/client'
+import { api, onAccesoPendiente, onSessionExpired, refreshAccess, tokenStore } from '../api/client'
 import { estadoDesdeError, systemStatus, useSystemStatus } from '../api/system'
 
 const AuthContext = createContext(null)
@@ -19,6 +19,16 @@ export function AuthProvider({ children }) {
             setUser(null)
             setStatus('anon')
             queryClient.clear()
+        })
+        // El servidor pide aceptar los términos vigentes: se actualiza el usuario y los guarda
+        // llevan a /aceptar-terminos.
+        onAccesoPendiente(async () => {
+            try {
+                const { data } = await api.get('/security/auth/me/')
+                setUser(data)
+            } catch {
+                // Si falla, el siguiente intento lo volverá a pedir.
+            }
         })
     }, [queryClient])
 

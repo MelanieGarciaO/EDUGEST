@@ -24,6 +24,10 @@ export default function Login() {
         e.preventDefault()
         setError('')
         setAviso('')
+        if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+            setError('Escribe un correo electrónico válido.')
+            return
+        }
         setLoading(true)
         try {
             // Al guardar la sesión, PublicOnly redirige solo: clave temporal -> crear clave;
@@ -80,6 +84,7 @@ export default function Login() {
                         label="Correo electrónico"
                         type="email"
                         autoComplete="username"
+                        maxLength={254}
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}

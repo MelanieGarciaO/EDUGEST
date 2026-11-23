@@ -9,6 +9,7 @@ const REFRESH_KEY = 'edugest.refresh'
 // (se borra al cerrar la pestaña).
 let accessToken = null
 let sessionExpiredHandler = null
+let accesoPendienteHandler = null
 
 function readRefresh() {
     try {
@@ -43,6 +44,14 @@ export const tokenStore = {
 /** Registra la función que se ejecuta cuando la sesión ya no se puede renovar. */
 export function onSessionExpired(handler) {
     sessionExpiredHandler = handler
+}
+
+/**
+ * Registra la función que se ejecuta cuando el servidor exige un paso de acceso pendiente
+ * (p. ej. se publicó una versión nueva de los términos con la sesión abierta).
+ */
+export function onAccesoPendiente(handler) {
+    accesoPendienteHandler = handler
 }
 
 export const api = axios.create({
@@ -107,6 +116,10 @@ api.interceptors.response.use(
         }
         const { response, config } = error
         const url = config?.url ?? ''
+        if (response?.status === 403 && response?.data?.code === 'terminos_pendientes') {
+            accesoPendienteHandler?.()
+            return Promise.reject(error)
+        }
         if (
             response?.status === 401 &&
             // La contraseña temporal venció y ya se envió otra al correo: no es una sesión vencida.
@@ -152,7 +165,9 @@ export function parseApiError(error, fallback = 'Ocurrió un error inesperado. I
         return { message: 'EduGest está en mantenimiento. Inténtalo más tarde.', fields: {}, status }
     }
     if (status === 429) {
-        return { message: 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.', fields: {}, status }
+        // El servidor dice cuánto esperar (1 minuto, 15 minutos o 1 hora según el límite).
+        const detalle = typeof data?.detail === 'string' ? data.detail : ''
+        return { message: detalle || 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.', fields: {}, status }
     }
     if (status >= 500) {
         return {
