@@ -130,7 +130,7 @@ export default function NuevaActividad() {
                 <Card className="max-w-3xl space-y-5">
                     {previewError && <Alert>{previewError.fields.texto ?? previewError.fields.paralelo ?? previewError.message}</Alert>}
                     <SelectField label="Curso y Paralelo" value={paraleloId} onChange={(e) => setParalelo(e.target.value)}>
-                        <option value="">Selecciona un paralelo</option>
+                        <option value="">Selecciona un curso y paralelo</option>
                         {paralelos.map(([id, nombre]) => (
                             <option key={id} value={id}>{nombre}</option>
                         ))}
