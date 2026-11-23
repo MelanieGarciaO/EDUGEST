@@ -25,9 +25,12 @@ el administrador nunca ve ni maneja contraseñas.
    b) POST auth/change-password/ {clave_temporal, new_password} -> contraseña nueva.
 
 Protecciones: las claves y códigos se guardan como hash, 5 intentos por clave, una nueva
-anula la anterior, espera de 60 s entre solicitudes y máximo 5 por hora.
+anula la anterior, espera de 60 s entre solicitudes y máximo 5 por hora. Los límites «por red»
+usan la IP real del cliente (red.py). El inicio de sesión se bloquea 15 minutos por cuenta tras
+10 intentos fallidos (comprobar_bloqueo_login).
 """
 
+import hashlib
 import secrets
 
 from django.conf import settings
@@ -110,6 +113,10 @@ class DemasiadasSolicitudes(APIException):
 
 
 def _limitar(clave, maximo, segundos, mensaje):
+    if clave.endswith(":None"):
+        # IP desconocida: no se aplica el límite por red (sería uno solo para todos los
+        # usuarios). Siguen vigentes los límites por correo y la espera entre envíos.
+        return
     usos = cache.get(clave, 0)
     if usos >= maximo:
         raise DemasiadasSolicitudes(mensaje)
@@ -163,9 +170,14 @@ def _comprobar(usuario, tipo, secreto, mensaje_invalido, incorrecto, pedir_otro)
     return None
 
 
+MAX_CLAVE = 128  # = maxLength de los campos de contraseña del frontend
+
+
 def _validar_nueva(usuario, nueva, temporal, campo="new_password"):
     if not nueva:
         raise ValidationError({campo: "Escribe la contraseña nueva."})
+    if len(nueva) > MAX_CLAVE:
+        raise ValidationError({campo: f"La contraseña puede tener máximo {MAX_CLAVE} caracteres."})
     if nueva == temporal or usuario.check_password(nueva):
         raise ValidationError({campo: "La contraseña nueva debe ser distinta de la actual y de la temporal."})
     try:
@@ -181,6 +193,42 @@ def _guardar_nueva(usuario, nueva):
     usuario.save(update_fields=["password", "must_change_password", "clave_temporal_expira_en", "updated_at"])
     revoke_user_tokens(usuario)
     avisos.clave_cambiada(usuario)
+
+
+# ---------------------------------------------------------------------------
+# Intentos fallidos de inicio de sesión por cuenta
+# ---------------------------------------------------------------------------
+def _clave_fallos(email):
+    email = str(email or "").strip().lower()
+    if not email:
+        return None
+    return "login:fallos:" + hashlib.sha256(email.encode()).hexdigest()
+
+
+def comprobar_bloqueo_login(email):
+    """
+    429 si la cuenta llegó al máximo de intentos fallidos. Se aplica igual a correos que no
+    existen, así la respuesta no revela qué cuentas están registradas.
+    """
+    clave = _clave_fallos(email)
+    if clave and cache.get(clave, 0) >= _ajuste("LOGIN_FALLOS_MAX", 10):
+        minutos = _ajuste("LOGIN_BLOQUEO_MINUTOS", 15)
+        raise DemasiadasSolicitudes(
+            f"Demasiados intentos fallidos con esta cuenta. Espera {minutos} minutos o "
+            "recupera tu contraseña con «¿Olvidaste tu contraseña?»."
+        )
+
+
+def registrar_fallo_login(email):
+    clave = _clave_fallos(email)
+    if clave:
+        cache.set(clave, cache.get(clave, 0) + 1, timeout=_ajuste("LOGIN_BLOQUEO_MINUTOS", 15) * 60)
+
+
+def limpiar_fallos_login(email):
+    clave = _clave_fallos(email)
+    if clave:
+        cache.delete(clave)
 
 
 # ---------------------------------------------------------------------------

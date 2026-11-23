@@ -177,16 +177,27 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "EXCEPTION_HANDLER": "edugest.sistema.api_exception_handler",
     "PAGE_SIZE": 20,
+    # Identifican al cliente por su IP real aunque la app esté detrás del proxy de Render.
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "apps.security.throttles.AnonPorIP",
+        "apps.security.throttles.UsuarioPorIP",
     ),
     "DEFAULT_THROTTLE_RATES": {
         "anon": "60/min",
         "user": "300/min",
-        "login": "5/min",  # Para usar con ScopedRateThrottle en la vista de login.
+        "login": "5/min",  # Intentos de inicio de sesión por IP (LoginPorIP).
     },
 }
+
+# Intentos FALLIDOS de inicio de sesión por cuenta (sin importar la IP): al llegar al máximo,
+# esa cuenta no puede intentar ingresar durante LOGIN_BLOQUEO_MINUTOS. Un ingreso correcto
+# reinicia el conteo.
+LOGIN_FALLOS_MAX = env.int("LOGIN_FALLOS_MAX", default=10)
+LOGIN_BLOQUEO_MINUTOS = env.int("LOGIN_BLOQUEO_MINUTOS", default=15)
+
+# La API rechaza (403) a quien no aceptó la versión vigente de los términos, además de la
+# pantalla del frontend. Solo las pruebas lo desactivan (edugest/test_settings.py).
+TERMINOS_OBLIGATORIOS_API = True
 
 # ---------------------------------------------------------------------------
 # JWT
@@ -231,7 +242,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 SECURE_HSTS_PRELOAD = False
 
 # Si el despliegue está detrás de un proxy que termina HTTPS (Render, Nginx, etc.).
-if env.bool("BEHIND_PROXY", default=False):
+# También define cómo se obtiene la IP real del cliente (ver apps/security/red.py).
+BEHIND_PROXY = env.bool("BEHIND_PROXY", default=False)
+if BEHIND_PROXY:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # ---------------------------------------------------------------------------

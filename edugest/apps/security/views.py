@@ -7,13 +7,15 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from . import avisos, cola_accesos, exportaciones, importaciones, recuperacion
 from .models import EnvioAcceso, Role, User
 from .permissions import IsAdministrador
+from .red import ip_cliente
+from .throttles import LoginPorIP
 from .serializers import (
     AceptarTerminosSerializer,
     ChangePasswordSerializer,
@@ -29,13 +31,30 @@ from .utils import revoke_user_tokens
 
 
 class LoginView(TokenObtainPairView):
-    """POST: correo + contraseña -> access, refresh y datos del usuario."""
+    """
+    POST: correo + contraseña -> access, refresh y datos del usuario.
+
+    Dos límites: 5 intentos por minuto desde la misma IP (LoginPorIP) y LOGIN_FALLOS_MAX
+    intentos FALLIDOS por cuenta (recuperacion.intentos_login), que frena a quien prueba
+    contraseñas de una cuenta cambiando de IP.
+    """
 
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [LoginPorIP]
     throttle_scope = "login"
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get("email") if hasattr(request.data, "get") else None
+        recuperacion.comprobar_bloqueo_login(email)
+        try:
+            respuesta = super().post(request, *args, **kwargs)
+        except AuthenticationFailed:
+            recuperacion.registrar_fallo_login(email)
+            raise
+        recuperacion.limpiar_fallos_login(email)
+        return respuesta
 
 
 class LogoutView(APIView):
@@ -282,7 +301,7 @@ class UserViewSet(viewsets.ModelViewSet):
 # Recuperación de contraseña con código OTP (público, sin sesión)
 # ---------------------------------------------------------------------------
 def _ip(request):
-    return request.META.get("REMOTE_ADDR") or None
+    return ip_cliente(request)  # IP real aunque la app esté detrás del proxy de Render
 
 
 class RecuperarSolicitarView(APIView):

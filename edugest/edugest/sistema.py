@@ -15,11 +15,13 @@ caído en lugar de un mensaje de error suelto.
 """
 
 import logging
+import math
 
 from django.conf import settings
 from django.db import DatabaseError, connection
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.exceptions import Throttled
 from rest_framework.permissions import AllowAny
 from rest_framework.views import exception_handler
 
@@ -107,6 +109,13 @@ def api_exception_handler(exc, context):
     if isinstance(exc, DatabaseError):
         logger.error("Base de datos no disponible", exc_info=exc)
         return respuesta_no_disponible()
+    if isinstance(exc, Throttled):
+        # El mensaje de DRF («Solicitud fue regulada (throttled)…») se reemplaza por uno claro.
+        segundos = math.ceil(exc.wait) if exc.wait else None
+        exc.detail = (
+            f"Demasiados intentos. Espera {segundos} segundos e inténtalo de nuevo."
+            if segundos else "Demasiados intentos. Espera un momento e inténtalo de nuevo."
+        )
     return exception_handler(exc, context)
 
 

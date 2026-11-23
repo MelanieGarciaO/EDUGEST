@@ -21,6 +21,10 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 logging.disable(logging.WARNING)
 
+# Las pruebas crean usuarios sin aceptar los términos; la exigencia en la API se prueba aparte
+# (apps/security/test_auth_validaciones.py).
+TERMINOS_OBLIGATORIOS_API = False
+
 # Las pruebas existentes usan grados altos (7.º y 8.º); la restricción se prueba aparte.
 GRADO_MINIMO_HABILITADO = 1
 GRADO_MAXIMO_HABILITADO = 10
