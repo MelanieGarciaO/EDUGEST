@@ -229,9 +229,9 @@ export default function Calificar() {
                     </p>
                 </Alert>
             )}
-            {cancelada && <Alert tone="warn" className="mb-5">Esta actividad fue cancelada y no se puede calificar.</Alert>}
+            {cancelada && <Alert tone="warn" className="mb-5 max-w-3xl">Esta actividad fue cancelada y no se puede calificar.</Alert>}
             {temprano && !cancelada && (
-                <Alert tone="warn" className="mb-5">Podrás calificar desde el día de entrega: {formatFecha(a.fecha_entrega)}.</Alert>
+                <Alert tone="warn" className="mb-5 max-w-3xl">Podrás calificar desde el día de entrega: {formatFecha(a.fecha_entrega)}.</Alert>
             )}
             {err && <Alert className="mb-5">{err.fields.tema ?? err.fields.calificaciones ?? err.message}</Alert>}
             {result && (

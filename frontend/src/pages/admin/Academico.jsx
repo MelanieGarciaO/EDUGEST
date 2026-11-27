@@ -163,7 +163,7 @@ function AsignaturasPanel() {
     const [form, setForm] = useState(null)
     const [toggle, setToggle] = useState(null)
     const asignaturas = useQuery({ queryKey: ['asignaturas'], queryFn: () => fetchAll('/academic/asignaturas/') })
-    const fields = [{ name: 'nombre', label: 'Nombre', maxLength: 100, hint: 'Por ejemplo: Matemática' }]
+    const fields = [{ name: 'nombre', label: 'Nombre', maxLength: 100, hint: 'Solo se aceptan las asignaturas habilitadas en EduGest (por ahora, Lengua y Literatura y Matemática).' }]
 
     return (
         <>
@@ -173,7 +173,7 @@ function AsignaturasPanel() {
                     Nueva asignatura
                 </Button>
             </div>
-            <Rows query={asignaturas} empty={<EmptyState icon={BookOpen} title="Aún no hay asignaturas">Crea las asignaturas que se dictan en la institución.</EmptyState>}>
+            <Rows query={asignaturas} empty={<EmptyState icon={BookOpen} title="Aún no hay asignaturas">Crea Lengua y Literatura y Matemática, las asignaturas que atiende EduGest.</EmptyState>}>
                 {asignaturas.data?.map((a) => (
                     <Row key={a.id} title={a.nombre} chips={!a.is_active && <Chip tone="danger">Inactiva</Chip>}>
                         <IconButton label={`Editar ${a.nombre}`} onClick={() => setForm({ item: a })}>

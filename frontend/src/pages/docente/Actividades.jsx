@@ -48,8 +48,8 @@ export default function DocenteActividades() {
 
             <Tabs tabs={TABS} value={vigencia} label="Estado de las actividades" onChange={(v) => { setVigencia(v); setPage(1) }} />
 
-            <SelectField label="Curso y Paralelo" className="mb-5 max-w-xs" value={paralelo} onChange={(e) => { setParalelo(e.target.value); setPage(1) }}>
-                <option value="">Todos mis Cursos y paralelos</option>
+            <SelectField label="Curso y paralelo" className="mb-5 max-w-xs" value={paralelo} onChange={(e) => { setParalelo(e.target.value); setPage(1) }}>
+                <option value="">Todos mis cursos y paralelos</option>
                 {paralelos.data?.map((p) => (
                     <option key={p.id} value={p.id}>{p.nombre_completo}</option>
                 ))}

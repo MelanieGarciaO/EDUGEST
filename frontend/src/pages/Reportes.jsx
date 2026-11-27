@@ -102,7 +102,7 @@ function TarjetaReporte({ reporte, opciones }) {
                         const requerido = reporte.requeridos.includes(k)
                         return (
                             <SelectField key={k} label={ETIQUETAS[k]} value={filtros[k] ?? ''} onChange={set(k)} className={k === 'estudiante' ? 'sm:col-span-2' : undefined}>
-                                <option value="">{requerido ? 'Selecciona…' : 'Todos'}</option>
+                                <option value="">{requerido ? 'Selecciona…' : k === 'asignatura' ? 'Todas' : 'Todos'}</option>
                                 {lista.map((o) => (
                                     <option key={o.id} value={o.id}>
                                         {o.paralelo ? `${o.nombre} · ${o.paralelo}` : o.nombre}

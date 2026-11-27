@@ -16,11 +16,12 @@ export function NivelChip({ nivel, corto = false }) {
     return (
         <span
             title={`${info.sigla}: ${info.nombre} (${info.rango})`}
-            className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', FONDO[info.tone])}
+            className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold', FONDO[info.tone])}
         >
             <span className={cx('size-2 rounded-full', PUNTO[info.tone])} aria-hidden="true" />
             <span>{info.sigla}</span>
-            {corto ? null : <span className="font-semibold">{`· ${info.nombre.replace(' requeridos', '')}`}</span>}
+            {/* En pantallas pequeñas solo se ve la sigla (el nombre queda para lectores de pantalla). */}
+            {corto ? null : <span className="sr-only font-semibold sm:not-sr-only">{`· ${info.nombre.replace(' requeridos', '')}`}</span>}
         </span>
     )
 }

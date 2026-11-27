@@ -112,7 +112,7 @@ function NotasActividad({ notas }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <NivelChip nivel={n.nivel} />
-                        <span className="text-2xl font-extrabold text-navy-800">
+                        <span className="whitespace-nowrap text-2xl font-extrabold text-navy-800">
                             {formatNota(n.valor)}
                             <span className="text-sm font-bold text-ink-500"> / 10</span>
                         </span>

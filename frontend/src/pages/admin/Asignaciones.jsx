@@ -87,7 +87,7 @@ export default function Asignaciones() {
     return (
         <>
             <PageHeader
-                title="Gestión de Cursos"
+                title="Gestión de cursos"
                 subtitle="Define qué docente dicta cada asignatura en cada paralelo. Con esto el docente ve sus grupos."
             >
                 <div className="flex flex-wrap items-start gap-2">

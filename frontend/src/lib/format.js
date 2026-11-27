@@ -25,16 +25,6 @@ export const ESCALA_LOEI = [
 ]
 const POR_NIVEL = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e]))
 
-export const NOTA_TONE = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e.tone]))
-export const NOTA_SIGLA = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e.sigla]))
-export const NOTA_NOMBRE = Object.fromEntries(ESCALA_LOEI.map((e) => [e.nivel, e.nombre]))
-export const NOTA_LABEL = {
-    DOMINA: 'Domina',
-    ALCANZA: 'Alcanza',
-    PROXIMO: 'Próximo a alcanzar',
-    NO_ALCANZA: 'No alcanza',
-}
-
 /** Nivel cualitativo de una nota (número 0–10). null si no hay nota. */
 export function nivelNota(valor) {
     if (valor == null || Number.isNaN(Number(valor))) return null

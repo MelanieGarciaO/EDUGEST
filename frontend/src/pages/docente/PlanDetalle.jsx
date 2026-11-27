@@ -381,7 +381,7 @@ export default function PlanDetalle() {
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 Volver a planes
             </Link>
-            <PageHeader title="Plan de refuerzo">
+            <PageHeader title="Plan de refuerzo" className="max-w-3xl">
                 {vigente && (
                     <div className="flex flex-wrap gap-2">
                         <Button variant="danger" onClick={() => { planAccion.reset(); setConfirm('cancelar') }}>

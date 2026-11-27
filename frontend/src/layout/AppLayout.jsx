@@ -14,7 +14,7 @@ const ADMIN_NAV = [
     { to: '/admin/usuarios', label: 'Usuarios', icon: Users },
     { to: '/admin/academico', label: 'Estructura académica', icon: School },
     { to: '/admin/estudiantes', label: 'Estudiantes', icon: GraduationCap },
-    { to: '/admin/asignaciones', label: 'Gestión de Cursos', icon: ClipboardList },
+    { to: '/admin/asignaciones', label: 'Gestión de cursos', icon: ClipboardList },
     { to: '/admin/temas', label: 'Temas', icon: ListTree },
     { to: '/admin/recursos', label: 'Banco de recursos', icon: Library },
     { to: '/admin/reportes', label: 'Reportes', icon: FileDown },

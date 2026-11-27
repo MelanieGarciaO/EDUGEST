@@ -191,9 +191,9 @@ export function Card({ as: Tag = 'section', className, children, ...rest }) {
     )
 }
 
-export function PageHeader({ title, subtitle, children }) {
+export function PageHeader({ title, subtitle, children, className = '' }) {
     return (
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <header className={`mb-6 flex flex-wrap items-end justify-between gap-3 ${className}`}>
             <div>
                 <h1 className="text-2xl font-extrabold tracking-tight text-navy-800 sm:text-3xl">{title}</h1>
                 {subtitle && <p className="mt-1 max-w-prose text-ink-500">{subtitle}</p>}
