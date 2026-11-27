@@ -20,7 +20,7 @@ from apps.security.permissions import (
 )
 
 from . import alerta, evidencias, ia, materiales, selectors, services
-from .models import ActividadRefuerzo, EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
+from .models import EstrategiaRefuerzo, NivelActividad, PlanRefuerzo
 from .permissions import IsDocenteOrRepresentante
 from .serializers import (
     GenerarRecursosIASerializer,

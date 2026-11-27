@@ -9,7 +9,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.academic import selectors as academic_selectors
-from apps.academic.models import AsignacionDocente, Tema
+from apps.academic.models import Tema
 from apps.grades.models import Calificacion
 from apps.security.models import Role
 from apps.security.permissions import IsDocente, IsPasswordUpToDate, IsRepresentante
@@ -148,9 +148,7 @@ class ActividadViewSet(viewsets.ModelViewSet):
         asignatura = _id_param(request.query_params, "asignatura")
         if paralelo is None or asignatura is None:
             raise ValidationError({"detail": "Indica el paralelo y la asignatura."})
-        if not AsignacionDocente.objects.filter(
-            docente=request.user, paralelo_id=paralelo, asignatura_id=asignatura, is_active=True
-        ).exists():
+        if not academic_selectors.docente_imparte(request.user, paralelo, asignatura):
             raise ValidationError({"asignatura": "No impartes esa asignatura en este paralelo."})
         estudiantes = estudiantes_para_evaluacion(paralelo, asignatura)
         return Response({"estudiantes": [{"id": e.id, "nombre": e.full_name} for e in estudiantes]})
@@ -163,9 +161,9 @@ class ActividadViewSet(viewsets.ModelViewSet):
         paralelo = serializer.validated_data["paralelo"]
         texto = serializer.validated_data["texto"]
 
-        asignaciones = AsignacionDocente.objects.filter(
-            docente=request.user, paralelo=paralelo, is_active=True
-        ).select_related("asignatura")
+        asignaciones = academic_selectors.asignaciones_visibles(request.user).filter(
+            paralelo=paralelo, is_active=True
+        )
         disponibles = [(a.asignatura_id, a.asignatura.nombre) for a in asignaciones]
 
         # Catálogo de temas (y subtemas) del grado para reconocer el tema en la indicación.

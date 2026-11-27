@@ -10,8 +10,9 @@ from apps.security.models import Role
 from apps.security.permissions import IsAdministrador, IsPasswordUpToDate
 
 from . import selectors
+from .asignaturas import solo_habilitadas
 from .grados import grado_maximo, grado_minimo
-from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Tema
+from .models import Asignatura, Grado, Tema
 from . import exportaciones, importaciones
 from .serializers import (
     AsignaturaSerializer,
@@ -107,7 +108,8 @@ class AsignaturaViewSet(AcademicViewSet):
     serializer_class = AsignaturaSerializer
 
     def get_queryset(self):
-        qs = Asignatura.objects.all()
+        # Solo se ofrecen las asignaturas habilitadas (ver asignaturas.py).
+        qs = solo_habilitadas(Asignatura.objects.all(), "id")
         qs = filter_by_active(qs, self.request.query_params)
         search = self.request.query_params.get("search")
         if search:
@@ -184,7 +186,7 @@ class TemaViewSet(AcademicViewSet):
 
     def get_queryset(self):
         params = self.request.query_params
-        qs = Tema.objects.select_related("grado", "asignatura", "padre")
+        qs = solo_habilitadas(Tema.objects.select_related("grado", "asignatura", "padre"))
         qs = filter_by_id(qs, params, "grado", "grado_id")
         qs = filter_by_id(qs, params, "asignatura", "asignatura_id")
         padre = params.get("padre")
@@ -196,9 +198,8 @@ class TemaViewSet(AcademicViewSet):
         if params.get("propios") == "true" and self.request.user.role == Role.DOCENTE:
             qs = qs.filter(
                 Exists(
-                    AsignacionDocente.objects.filter(
-                        docente=self.request.user,
-                        is_active=True,
+                    selectors.asignaciones_activas_de(
+                        self.request.user,
                         asignatura_id=OuterRef("asignatura_id"),
                         paralelo__grado_id=OuterRef("grado_id"),
                     )

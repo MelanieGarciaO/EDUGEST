@@ -1,10 +1,8 @@
 from django.test import override_settings
-from rest_framework.test import APITestCase
 
-from apps.security.models import Role
 
-from .models import Asignatura, Grado, Paralelo
-from .tests import AcademicBase, make_user
+from .models import Grado, Paralelo
+from .tests import AcademicBase
 
 
 @override_settings(GRADO_MINIMO_HABILITADO=5, GRADO_MAXIMO_HABILITADO=7)

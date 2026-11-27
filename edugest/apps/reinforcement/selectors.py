@@ -10,7 +10,8 @@ Visibilidad por rol en el módulo de refuerzo.
 
 from django.db.models import Exists, OuterRef, Prefetch, Q
 
-from apps.academic.models import AsignacionDocente
+from apps.academic.asignaturas import solo_habilitadas
+from apps.academic.selectors import asignaciones_activas_de
 from apps.security.models import Role
 
 from .models import ActividadRefuerzo, EvidenciaActividad, PlanRefuerzo, RecursoRefuerzo, TemaPlan
@@ -31,15 +32,12 @@ PLAN_PREFETCH = Prefetch(
 
 
 def planes_base(user):
-    qs = PlanRefuerzo.objects.all()
+    qs = solo_habilitadas(PlanRefuerzo.objects.all())
     if user.role == Role.ADMINISTRADOR:
         return qs
     if user.role == Role.DOCENTE:
-        imparte = AsignacionDocente.objects.filter(
-            docente=user,
-            is_active=True,
-            asignatura_id=OuterRef("asignatura_id"),
-            paralelo_id=OuterRef("estudiante__paralelo_id"),
+        imparte = asignaciones_activas_de(
+            user, asignatura_id=OuterRef("asignatura_id"), paralelo_id=OuterRef("estudiante__paralelo_id")
         )
         return qs.filter(Exists(imparte))
     if user.role == Role.REPRESENTANTE:
@@ -92,23 +90,19 @@ def recursos_visibles(user):
     qs = RecursoRefuerzo.objects.select_related(
         "tema__grado", "tema__asignatura", "tema__padre", "creado_por"
     )
+    qs = solo_habilitadas(qs, "tema__asignatura_id")
     if user.role == Role.ADMINISTRADOR:
         return qs
     if user.role == Role.DOCENTE:
-        imparte = AsignacionDocente.objects.filter(
-            docente=user,
-            is_active=True,
-            asignatura_id=OuterRef("tema__asignatura_id"),
-            paralelo__grado_id=OuterRef("tema__grado_id"),
+        imparte = asignaciones_activas_de(
+            user, asignatura_id=OuterRef("tema__asignatura_id"), paralelo__grado_id=OuterRef("tema__grado_id")
         )
         return qs.filter(Exists(imparte))
     return qs.none()
 
 
 def docente_imparte_en_grado(user, asignatura_id, grado_id):
-    return AsignacionDocente.objects.filter(
-        docente=user, is_active=True, asignatura_id=asignatura_id, paralelo__grado_id=grado_id
-    ).exists()
+    return asignaciones_activas_de(user, asignatura_id=asignatura_id, paralelo__grado_id=grado_id).exists()
 
 
 def estudiantes_para_evaluacion(paralelo_id, asignatura_id):

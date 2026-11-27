@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from apps.academic.models import Asignatura, AsignacionDocente, Estudiante, Grado, Paralelo
@@ -477,19 +476,6 @@ class CancelarTests(ActivitiesBase):
 
 
 class SelectoresTests(ActivitiesBase):
-    def test_representantes_de_actividad_sin_repetidos(self):
-        Estudiante.objects.create(
-            first_name="Ana", last_name="Pérez", paralelo=self.par_a, representante=self.rep1
-        )
-        actividad = self.crear_actividad(self.asig1)
-        self.assertEqual(list(selectors.representantes_de_actividad(actividad)), [self.rep1])
-
-    def test_no_incluye_representantes_inactivos_ni_de_estudiantes_inactivos(self):
-        actividad = self.crear_actividad(self.asig1)
-        self.est1.is_active = False
-        self.est1.save()
-        self.assertEqual(list(selectors.representantes_de_actividad(actividad)), [])
-
     def test_actividades_para_recordatorio(self):
         manana = self.crear_actividad(self.asig1, fecha=MANANA)
         self.crear_actividad(self.asig1, fecha=HOY + timedelta(days=3))

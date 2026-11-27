@@ -5,6 +5,7 @@ from rest_framework import serializers
 from apps.security.models import Role, User
 from apps.security.validadores import con_letras, nombre_persona
 
+from .asignaturas import exigir_habilitada, nombre_habilitado, mensaje_asignatura_no_habilitada
 from .grados import grado_habilitado, mensaje_grado_no_habilitado
 from .models import Asignatura, AsignacionDocente, Estudiante, Grado, Paralelo, Tema
 
@@ -72,6 +73,8 @@ class AsignaturaSerializer(serializers.ModelSerializer):
 
     def validate_nombre(self, value):
         value = con_letras(value, "El nombre de la asignatura debe contener letras.")
+        if not nombre_habilitado(value):
+            raise serializers.ValidationError(mensaje_asignatura_no_habilitada())
         qs = Asignatura.objects.filter(nombre__iexact=value)
         if self.instance is not None:
             qs = qs.exclude(pk=self.instance.pk)
@@ -181,6 +184,10 @@ class AsignacionDocenteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(mensaje_grado_no_habilitado())
         return value
 
+    def validate_asignatura(self, value):
+        cambia = self.instance is None or value.pk != self.instance.asignatura_id
+        return exigir_habilitada(value) if cambia else value
+
 
 class TemaSerializer(serializers.ModelSerializer):
     grado = serializers.PrimaryKeyRelatedField(queryset=Grado.objects.all())
@@ -225,6 +232,10 @@ class TemaSerializer(serializers.ModelSerializer):
         if self.instance is None and not grado_habilitado(value):
             raise serializers.ValidationError(mensaje_grado_no_habilitado())
         return value
+
+    def validate_asignatura(self, value):
+        # Como el grado, solo se controla al crear.
+        return exigir_habilitada(value) if self.instance is None else value
 
     def validate_is_active(self, value):
         if (

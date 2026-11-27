@@ -12,7 +12,6 @@ Los módulos de origen no dependen de este: solo emiten señales.
 """
 
 import logging
-from collections import defaultdict
 
 from django.db import transaction
 from django.dispatch import receiver
@@ -25,12 +24,19 @@ from apps.grades.signals import calificaciones_guardadas
 from apps.reinforcement.models import PlanRefuerzo
 from apps.reinforcement.signals import plan_aprobado, plan_cancelado, plan_completado, plan_evaluado
 
+from .contenido import (
+    RUTA_ACTIVIDADES,
+    detalles_actividad,
+    entrega,
+    estudiantes_por_representante,
+    nombres,
+    resumen,
+)
 from .models import Categoria
 from .servicio import Correo, notificar
 
 logger = logging.getLogger(__name__)
 
-RUTA_ACTIVIDADES = "/representante/actividades"
 CAMPOS_VISIBLES = {
     "descripcion": "Descripción",
     "fecha_entrega": "Fecha de entrega",
@@ -54,55 +60,6 @@ def _seguro(funcion):
     return envoltura
 
 
-# ---------------------------------------------------------------------------
-# Utilidades
-# ---------------------------------------------------------------------------
-def _fecha(valor):
-    return valor.strftime("%d/%m/%Y") if valor else ""
-
-
-def _entrega(actividad):
-    texto = _fecha(actividad.fecha_entrega)
-    if actividad.hora_entrega and actividad.hora_entrega.strftime("%H:%M") != "00:00":
-        texto += f" hasta las {actividad.hora_entrega.strftime('%H:%M')}"
-    return texto
-
-
-def _resumen(texto, maximo=160):
-    texto = " ".join((texto or "").split())
-    return texto if len(texto) <= maximo else texto[: maximo - 1].rsplit(" ", 1)[0] + "…"
-
-
-def _estudiantes_por_representante(actividad):
-    """
-    {representante: [estudiantes]} de los estudiantes a los que va la actividad: todo el
-    paralelo o, en una evaluación de refuerzo, solo los que completaron su plan.
-    """
-    grupos = defaultdict(list)
-    for e in actividad.estudiantes_dirigidos().select_related("representante"):
-        grupos[e.representante].append(e)
-    return grupos
-
-
-def _nombres(estudiantes):
-    nombres = [e.first_name.split()[0] for e in estudiantes]
-    return nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1]
-
-
-def _detalles_actividad(actividad):
-    detalles = [
-        ("Asignatura", actividad.asignacion.asignatura.nombre),
-        ("Paralelo", actividad.asignacion.paralelo.nombre_completo),
-        ("Entrega", _entrega(actividad)),
-    ]
-    if actividad.tema:
-        detalles.append(("Tema", actividad.tema))
-    if actividad.materiales:
-        detalles.append(("Materiales", ", ".join(actividad.materiales)))
-    detalles.append(("Modalidad", actividad.get_modalidad_entrega_display()))
-    return detalles
-
-
 def _actividad(actividad):
     return Actividad.objects.select_related(
         "asignacion__asignatura", "asignacion__paralelo__grado", "asignacion__docente"
@@ -117,17 +74,17 @@ def _actividad(actividad):
 def actividad_nueva(sender, actividad, **kwargs):
     a = _actividad(actividad)
     asignatura = a.asignacion.asignatura.nombre
-    for representante, estudiantes in _estudiantes_por_representante(a).items():
-        quien = _nombres(estudiantes)
+    for representante, estudiantes in estudiantes_por_representante(a).items():
+        quien = nombres(estudiantes)
         notificar(
             [representante], Categoria.ACTIVIDADES, "actividad_publicada",
             titulo=f"Nueva actividad de {asignatura}",
-            mensaje=f"Para {quien}: {_resumen(a.descripcion)} Entrega: {_entrega(a)}.",
+            mensaje=f"Para {quien}: {resumen(a.descripcion)} Entrega: {entrega(a)}.",
             enlace=RUTA_ACTIVIDADES,
             correo=Correo(
                 asunto=f"Nueva actividad de {asignatura}",
                 parrafos=[f"{a.asignacion.docente.full_name} publicó una actividad para {quien}:", a.descripcion],
-                detalles=_detalles_actividad(a),
+                detalles=detalles_actividad(a),
                 boton=("Ver la actividad", RUTA_ACTIVIDADES),
             ),
         )
@@ -142,16 +99,16 @@ def actividad_cambiada(sender, actividad, campos=(), **kwargs):
     a = _actividad(actividad)
     asignatura = a.asignacion.asignatura.nombre
     lista = ", ".join(cambiados).lower()
-    for representante, estudiantes in _estudiantes_por_representante(a).items():
+    for representante, estudiantes in estudiantes_por_representante(a).items():
         notificar(
             [representante], Categoria.ACTIVIDADES, "actividad_modificada",
             titulo=f"Cambió una actividad de {asignatura}",
-            mensaje=f"Se actualizó: {lista}. Entrega: {_entrega(a)}.",
+            mensaje=f"Se actualizó: {lista}. Entrega: {entrega(a)}.",
             enlace=RUTA_ACTIVIDADES,
             correo=Correo(
                 asunto=f"Cambió una actividad de {asignatura}",
-                parrafos=[f"El docente actualizó la actividad de {_nombres(estudiantes)} ({lista}). Así quedó:", a.descripcion],
-                detalles=_detalles_actividad(a),
+                parrafos=[f"El docente actualizó la actividad de {nombres(estudiantes)} ({lista}). Así quedó:", a.descripcion],
+                detalles=detalles_actividad(a),
                 boton=("Ver la actividad", RUTA_ACTIVIDADES),
             ),
         )
@@ -162,16 +119,16 @@ def actividad_cambiada(sender, actividad, campos=(), **kwargs):
 def actividad_anulada(sender, actividad, **kwargs):
     a = _actividad(actividad)
     asignatura = a.asignacion.asignatura.nombre
-    for representante, estudiantes in _estudiantes_por_representante(a).items():
+    for representante, estudiantes in estudiantes_por_representante(a).items():
         notificar(
             [representante], Categoria.ACTIVIDADES, "actividad_cancelada",
             titulo=f"Se canceló una actividad de {asignatura}",
-            mensaje=f"Ya no hay que entregar: {_resumen(a.descripcion)}",
+            mensaje=f"Ya no hay que entregar: {resumen(a.descripcion)}",
             enlace=RUTA_ACTIVIDADES,
             correo=Correo(
                 asunto=f"Se canceló una actividad de {asignatura}",
-                parrafos=[f"El docente canceló esta actividad de {_nombres(estudiantes)}; ya no hay que entregarla:", a.descripcion],
-                detalles=[("Asignatura", asignatura), ("Entrega prevista", _entrega(a))],
+                parrafos=[f"El docente canceló esta actividad de {nombres(estudiantes)}; ya no hay que entregarla:", a.descripcion],
+                detalles=[("Asignatura", asignatura), ("Entrega prevista", entrega(a))],
                 boton=("Ver actividades", RUTA_ACTIVIDADES),
             ),
         )
@@ -205,7 +162,7 @@ def _avisar_notas(actividad_id, estudiantes):
         notificar(
             [e.representante], Categoria.CALIFICACIONES, "calificacion",
             titulo=f"{e.first_name.split()[0]} tiene nota en {asignatura}: {valor}",
-            mensaje=_resumen(a.descripcion) + (f" Observación: {_resumen(c.observacion, 200)}" if c.observacion else ""),
+            mensaje=resumen(a.descripcion) + (f" Observación: {resumen(c.observacion, 200)}" if c.observacion else ""),
             enlace=RUTA_ACTIVIDADES,
             correo=Correo(
                 asunto=f"Nueva calificación de {e.first_name.split()[0]} en {asignatura}",

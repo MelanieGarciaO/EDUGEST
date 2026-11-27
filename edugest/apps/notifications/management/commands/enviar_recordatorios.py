@@ -16,8 +16,15 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.activities.models import Actividad, ArchivoEntrega
+from apps.activities.selectors import actividades_para_recordatorio
 from apps.notifications.models import Categoria, Notificacion
-from apps.notifications.receivers import RUTA_ACTIVIDADES, _detalles_actividad, _entrega, _estudiantes_por_representante, _nombres
+from apps.notifications.contenido import (
+    RUTA_ACTIVIDADES,
+    detalles_actividad,
+    entrega,
+    estudiantes_por_representante,
+    nombres,
+)
 from apps.notifications.servicio import Correo, notificar
 
 
@@ -33,9 +40,7 @@ class Command(BaseCommand):
         except ValueError:
             raise CommandError("Usa el formato AAAA-MM-DD.") from None
 
-        actividades = Actividad.objects.filter(
-            estado=Actividad.Estado.PUBLICADA, fecha_entrega=objetivo
-        ).select_related("asignacion__asignatura", "asignacion__paralelo__grado", "asignacion__docente")
+        actividades = actividades_para_recordatorio(hoy=objetivo - timedelta(days=1))
 
         enviados = 0
         for a in actividades:
@@ -46,20 +51,20 @@ class Command(BaseCommand):
                 Notificacion.objects.filter(tipo=f"recordatorio:{a.pk}").values_list("usuario_id", flat=True)
             )
             asignatura = a.asignacion.asignatura.nombre
-            for representante, estudiantes in _estudiantes_por_representante(a).items():
+            for representante, estudiantes in estudiantes_por_representante(a).items():
                 faltan = [e for e in estudiantes if e.pk not in entregaron]
                 if not faltan or representante.pk in ya_avisados:
                     continue
-                quien = _nombres(faltan)
+                quien = nombres(faltan)
                 notificar(
                     [representante], Categoria.RECORDATORIOS, f"recordatorio:{a.pk}",
                     titulo=f"Mañana se entrega la actividad de {asignatura}",
-                    mensaje=f"Recuerda revisar la actividad de {quien}. Entrega: {_entrega(a)}.",
+                    mensaje=f"Recuerda revisar la actividad de {quien}. Entrega: {entrega(a)}.",
                     enlace=RUTA_ACTIVIDADES,
                     correo=Correo(
                         asunto=f"Recordatorio: mañana se entrega la actividad de {asignatura}",
                         parrafos=[f"Mañana vence esta actividad de {quien}:", a.descripcion],
-                        detalles=_detalles_actividad(a),
+                        detalles=detalles_actividad(a),
                         boton=("Ver la actividad", RUTA_ACTIVIDADES),
                     ),
                     inmediato=True,  # el comando termina enseguida: no se usa hilo

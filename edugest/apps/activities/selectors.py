@@ -14,7 +14,8 @@ from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.security.models import Role, User
+from apps.academic.asignaturas import solo_habilitadas
+from apps.security.models import Role
 
 from .models import Actividad
 
@@ -27,6 +28,7 @@ _RELACIONES = (
 
 def actividades_visibles(user):
     qs = Actividad.objects.select_related(*_RELACIONES).prefetch_related("adjuntos", "destinatarios")
+    qs = solo_habilitadas(qs, "asignacion__asignatura_id")
     if user.role == Role.ADMINISTRADOR:
         return qs
     if user.role == Role.DOCENTE:
@@ -42,22 +44,11 @@ def actividades_visibles(user):
     return qs.none()
 
 
-def representantes_de_actividad(actividad):
-    """
-    Representantes activos con algún estudiante al que va la actividad (todo el paralelo
-    o, en una evaluación de refuerzo, solo sus destinatarios). Sin repetidos.
-    """
-    return User.objects.filter(
-        role=Role.REPRESENTANTE,
-        is_active=True,
-        estudiantes_representados__in=actividad.estudiantes_dirigidos(),
-    ).distinct()
-
-
 def actividades_para_recordatorio(hoy=None, dias_antes=1):
-    """Actividades publicadas cuya entrega vence dentro de `dias_antes` días."""
+    """Actividades publicadas cuya entrega vence dentro de `dias_antes` días (comando de recordatorios)."""
     hoy = hoy or timezone.localdate()
-    return Actividad.objects.select_related(*_RELACIONES).filter(
+    qs = Actividad.objects.select_related(*_RELACIONES).filter(
         estado=Actividad.Estado.PUBLICADA,
         fecha_entrega=hoy + timedelta(days=dias_antes),
     )
+    return solo_habilitadas(qs, "asignacion__asignatura_id")

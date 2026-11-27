@@ -9,7 +9,8 @@ Visibilidad por rol de calificaciones y dificultades.
 
 from django.db.models import Exists, OuterRef
 
-from apps.academic.models import AsignacionDocente
+from apps.academic.asignaturas import solo_habilitadas
+from apps.academic.selectors import asignaciones_activas_de
 from apps.security.models import Role
 
 from .models import Calificacion, Dificultad
@@ -19,6 +20,7 @@ def calificaciones_visibles(user):
     qs = Calificacion.objects.select_related(
         "actividad__asignacion__asignatura", "estudiante", "tema"
     )
+    qs = solo_habilitadas(qs, "actividad__asignacion__asignatura_id")
     if user.role == Role.ADMINISTRADOR:
         return qs
     if user.role == Role.DOCENTE:
@@ -32,12 +34,12 @@ def dificultades_visibles(user):
     qs = Dificultad.objects.select_related(
         "estudiante__paralelo__grado", "tema__asignatura", "tema__padre"
     )
+    qs = solo_habilitadas(qs, "tema__asignatura_id")
     if user.role == Role.ADMINISTRADOR:
         return qs
     if user.role == Role.DOCENTE:
-        imparte = AsignacionDocente.objects.filter(
-            docente=user,
-            is_active=True,
+        imparte = asignaciones_activas_de(
+            user,
             asignatura_id=OuterRef("tema__asignatura_id"),
             paralelo_id=OuterRef("estudiante__paralelo_id"),
         )

@@ -53,6 +53,12 @@ DATOS_PLAZO_CONSERVACION = env("DATOS_PLAZO_CONSERVACION", default="")
 GRADO_MINIMO_HABILITADO = env.int("GRADO_MINIMO_HABILITADO", default=5)
 GRADO_MAXIMO_HABILITADO = env.int("GRADO_MAXIMO_HABILITADO", default=7)
 
+# Asignaturas habilitadas (nombres separados por coma; vacío = todas). Otras asignaturas pueden
+# existir en la base de datos, pero el aplicativo no las muestra (ver apps/academic/asignaturas.py).
+ASIGNATURAS_HABILITADAS = env.list(
+    "ASIGNATURAS_HABILITADAS", default=["Lengua y Literatura", "Matemática"]
+)
+
 # ---------------------------------------------------------------------------
 # Aplicaciones
 # ---------------------------------------------------------------------------

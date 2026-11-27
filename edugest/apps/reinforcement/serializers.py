@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from apps.academic.asignaturas import exigir_habilitada
 from apps.academic.models import Asignatura, Tema
 from apps.grades.models import Dificultad
 from apps.security.models import Role
@@ -272,6 +273,9 @@ class GenerarPlanSerializer(serializers.Serializer):
     )
     temas_manuales = TemaManualSerializer(many=True, required=False)
 
+    def validate_asignatura(self, value):
+        return exigir_habilitada(value)
+
 
 MAX_DUA = 800
 
@@ -455,6 +459,10 @@ class RecursoSerializer(serializers.ModelSerializer):
     def validate_enlace(self, value):
         return _validar_enlace(value)
 
+    def validate_tema(self, value):
+        exigir_habilitada(value.asignatura)
+        return value
+
     def validate_formatos(self, value):
         # Al crear puede ir vacío (se deduce del texto); al editar debe quedar al menos uno.
         if not value and self.instance is not None:
@@ -526,6 +534,7 @@ class GenerarRecursosIASerializer(serializers.Serializer):
             raise serializers.ValidationError(exc.detail["indicaciones"]) from None
 
     def validate_tema(self, tema):
+        exigir_habilitada(tema.asignatura)
         user = self.context["request"].user
         if user.role == Role.DOCENTE and not selectors.docente_imparte_en_grado(user, tema.asignatura_id, tema.grado_id):
             raise serializers.ValidationError("Solo puedes generar recursos de las asignaturas y grados que impartes.")

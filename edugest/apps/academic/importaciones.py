@@ -29,8 +29,9 @@ from rest_framework.exceptions import ValidationError
 from apps.grades.mapeo import filas_csv
 from apps.security.models import Role, User
 
+from .asignaturas import asignaturas_habilitadas
 from .grados import grado_maximo, grado_minimo
-from .models import AsignacionDocente, Asignatura, Estudiante, Paralelo
+from .models import AsignacionDocente, Estudiante, Paralelo
 from .serializers import AsignacionDocenteSerializer, EstudianteSerializer
 
 TAMANO_MAXIMO = 2 * 1024 * 1024  # 2 MB
@@ -97,7 +98,7 @@ def _usuarios(rol):
 
 
 def _asignaturas():
-    return list(Asignatura.objects.filter(is_active=True).order_by("nombre"))
+    return list(asignaturas_habilitadas().filter(is_active=True).order_by("nombre"))
 
 
 def exigir_requisitos(config):
@@ -107,7 +108,7 @@ def exigir_requisitos(config):
     if config is ASIGNACIONES:
         if not User.objects.filter(role=Role.DOCENTE, is_active=True).exists():
             raise ValidationError({"archivo": "Primero registra al menos un docente activo."})
-        if not Asignatura.objects.filter(is_active=True).exists():
+        if not _asignaturas():
             raise ValidationError({"archivo": "Primero registra al menos una asignatura activa."})
     if not _paralelos():
         raise ValidationError({"archivo": "Primero registra al menos un paralelo activo."})

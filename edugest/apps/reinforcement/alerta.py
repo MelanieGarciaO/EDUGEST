@@ -8,11 +8,12 @@ Indicadores agregados (sin datos personales de estudiantes):
 Además, un resumen general: estudiantes con dificultad, reincidentes, planes activos y
 porcentaje de planes revisados por la familia.
 
-Solo cuenta estudiantes activos y temas de los grados habilitados.
+Solo cuenta estudiantes activos, y temas de los grados y asignaturas habilitados.
 """
 
 from django.db.models import Avg, Count, Q
 
+from apps.academic.asignaturas import solo_habilitadas
 from apps.academic.grados import grado_maximo, grado_minimo
 from apps.academic.models import Estudiante
 from apps.grades import scale
@@ -31,13 +32,15 @@ def alerta_temprana(limite=LIMITE):
     rango = {"tema__grado__orden__gte": grado_minimo(), "tema__grado__orden__lte": grado_maximo()}
     activos = {"estudiante__is_active": True}
 
-    dificultades = Dificultad.objects.filter(estado=Dificultad.Estado.DETECTADA, **rango, **activos)
-    califs = Calificacion.objects.filter(**rango, **activos)
-    planes_activos = PlanRefuerzo.objects.filter(
+    dificultades = solo_habilitadas(
+        Dificultad.objects.filter(estado=Dificultad.Estado.DETECTADA, **rango, **activos), "tema__asignatura_id"
+    )
+    califs = solo_habilitadas(Calificacion.objects.filter(**rango, **activos), "tema__asignatura_id")
+    planes_activos = solo_habilitadas(PlanRefuerzo.objects).filter(
         estado__in=[PlanRefuerzo.Estado.APROBADA, PlanRefuerzo.Estado.COMPLETADA],
         estudiante__is_active=True,
     )
-    publicados = PlanRefuerzo.objects.exclude(
+    publicados = solo_habilitadas(PlanRefuerzo.objects).exclude(
         estado__in=[PlanRefuerzo.Estado.PROPUESTA, PlanRefuerzo.Estado.CANCELADA]
     ).filter(estudiante__is_active=True)
 

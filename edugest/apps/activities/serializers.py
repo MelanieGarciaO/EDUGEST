@@ -4,7 +4,9 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
-from apps.academic.models import Asignatura, AsignacionDocente, Paralelo
+from apps.academic import selectors as academic_selectors
+from apps.academic.asignaturas import exigir_habilitada
+from apps.academic.models import Asignatura, Paralelo
 from apps.grades import scale
 from apps.security.models import Role
 
@@ -254,6 +256,9 @@ class ActividadCrearSerializer(serializers.Serializer):
     )
     extraccion = ExtraccionDelDocenteField(required=False, allow_null=True)
 
+    def validate_asignatura(self, value):
+        return exigir_habilitada(value)
+
     def validate_materiales(self, value):
         return limpiar_materiales(value)
 
@@ -264,11 +269,8 @@ class ActividadCrearSerializer(serializers.Serializer):
         attrs["hora_entrega"] = attrs.get("hora_entrega") or SIN_HORA
         validar_hora_no_pasada(attrs["fecha_entrega"], attrs["hora_entrega"])
         user = self.context["request"].user
-        asignacion = AsignacionDocente.objects.filter(
-            docente=user,
-            paralelo=attrs["paralelo"],
-            asignatura=attrs["asignatura"],
-            is_active=True,
+        asignacion = academic_selectors.asignaciones_activas_de(
+            user, paralelo=attrs["paralelo"], asignatura=attrs["asignatura"]
         ).first()
         if asignacion is None:
             raise serializers.ValidationError(
